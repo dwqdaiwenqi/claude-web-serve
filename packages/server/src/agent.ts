@@ -42,6 +42,7 @@ export interface SseDone {
   sessionId: string | null
   cost?: number
   tokens?: { input: number; output: number; cache: { read: number; write: number } }
+  messages?: SseRawMessage[]
 }
 
 function sseWrite(reply: FastifyReply, ev: SseEvent) {
@@ -216,10 +217,14 @@ export async function runAgent(
   const options = buildOptions(runtime, undefined, bypassPermissions)
   let cost: number | undefined
   let tokens: SseDone['tokens']
+  const messages: SseRawMessage[] = []
 
   try {
     for await (const message of query(buildSdkPrompt(content, options))) {
       handleMessage(message, runtime)
+      if (message.type === 'assistant' || message.type === 'user') {
+        messages.push(message as unknown as SseRawMessage)
+      }
       if (message.type === 'result' && message.subtype === 'success') {
         cost = (message as any).total_cost_usd
         const u = (message as any).usage ?? {}
@@ -241,7 +246,7 @@ export async function runAgent(
     runtime.status = 'idle'
   }
 
-  return { sessionId: runtime.sessionId, cost, tokens }
+  return { sessionId: runtime.sessionId, cost, tokens, messages }
 }
 
 /** 流式模式：边产生边通过 SSE 推送，完成后发 done 事件 */
