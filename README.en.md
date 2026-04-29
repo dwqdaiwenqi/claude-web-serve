@@ -2,6 +2,8 @@ English | [简体中文](./README.md)
 
 # Claude Web
 
+[![License](https://img.shields.io/github/license/dwqdaiwenqi/claude-code-web)](https://github.com/dwqdaiwenqi/claude-code-web/blob/main/LICENSE)
+
 Wraps the [Claude Code Agent SDK](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk) as a **REST/SSE HTTP service** with a built-in Web UI.
 
 **Any language, any platform** can drive Claude Code over HTTP — no SDK knowledge required.
@@ -137,12 +139,12 @@ SSE event types: `part` (incremental content) / `done` (finished + stats) / `err
 
 <image src="./preview3.gif" style="margin:0 auto;width:900px;"/>
 
-| Feature | Description |
-| --- | --- |
+| Feature            | Description                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------- |
 | `@` file reference | Type `@` to search and reference any project file; path is injected into the prompt automatically |
-| `/` slash commands | `/init` generates CLAUDE.md, `/cost` shows token usage, `/clear` resets the session |
-| Image paste | `Ctrl+V` / `Cmd+V` pastes screenshots directly; auto-converted to base64 (multimodal) |
-| `Shift+Enter` | Insert a newline without submitting |
+| `/` slash commands | `/init` generates CLAUDE.md, `/cost` shows token usage, `/clear` resets the session               |
+| Image paste        | `Ctrl+V` / `Cmd+V` pastes screenshots directly; auto-converted to base64 (multimodal)             |
+| `Shift+Enter`      | Insert a newline without submitting                                                               |
 
 #### Built-in terminal
 
