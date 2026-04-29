@@ -2,26 +2,72 @@
 
 # Claude Web
 
-将 [Claude Code Agent SDK](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk) 封装为 REST API 服务，并提供开箱即用的 Web 界面。任何语言、任何平台都可以通过 HTTP 接口调用 Claude Code，也可以直接使用 Web 界面与 Claude 对话。
+将 [Claude Code Agent SDK](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk) 封装为 **REST/SSE HTTP 服务**，并附带开箱即用的 Web 界面。
+
+**任何语言、任何平台**都可以通过 HTTP 接口驱动 Claude Code，无需关心 SDK 细节。
 
 > **前提**：已安装并登录 Claude Code CLI（`claude` 命令可用）
 
-#### 基本使用：
-
 <image src="./preview1.gif" style="margin:0 auto;width:900px;"/>
 
-#### 富文本输入框
+---
 
-不同于大多数 Claude Web UI 只支持纯文本输入，本项目提供了更强的输入体验：
+## 为什么用 Claude Web？
 
-| 功能          | 说明                                                                                                                               |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `@` 文件引用  | 输入 `@` 搜索并引用项目内任意文件，文件路径自动注入到 prompt                                                                       |
-| `/` 斜杠命令  | 输入 `/` 触发内置命令：`/init`（生成 CLAUDE.md）、`/cost`（查看 Token 消耗）、`/context`（可视化上下文用量）、`/clear`（清空会话） |
-| 图片粘贴      | 直接 `Ctrl+V` / `Cmd+V` 粘贴截图或剪贴板图片，自动转 base64 发给模型（多模态）                                                     |
-| `Shift+Enter` | 换行而不触发发送                                                                                                                   |
+```
+你的代码 / 脚本 / 工作流
+        │  HTTP / SSE
+        ▼
+  claude-web server          ← 本项目
+        │
+        ▼
+ Claude Code Agent SDK
+        │
+        ▼
+     Claude API
+```
 
-<image src="./preview3.gif" style="margin:0 auto;width:900px;"/>
+- **API 优先**：对外暴露干净的 REST + SSE 接口，curl / Python / Node / 任何 HTTP 客户端直接调用
+- **零数据库**：直接复用 Claude CLI 原生 JSONL 格式，无需额外运维
+- **Web UI 内置**：同一个进程同时提供 API 和可视化界面，部署极简
+- **流式输出**：SSE 实时推送 Claude 的思考过程和工具调用
+
+---
+
+### 用任意语言调用 Claude Code
+
+用 curl / Python 直接发 HTTP 请求：
+
+```bash
+# 新建会话，让 Claude 帮你分析代码
+curl -X POST 'http://127.0.0.1:8003/api/session/new/message' \
+  -H 'Content-Type: application/json' \
+  -d '{"cwd":"/your/project","prompt":"帮我找出这个项目里所有潜在的内存泄漏"}'
+```
+
+```python
+# Python 示例
+import requests, json
+
+resp = requests.post("http://127.0.0.1:8003/api/session/new/message", json={
+    "cwd": "/your/project",
+    "prompt": "帮我写完整的单元测试覆盖 src/utils.py"
+})
+print(resp.json()["messages"][-1])
+```
+
+```js
+// Node.js 示例
+const response = await fetch('http://127.0.0.1:8003/api/session/new/message', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+  body: JSON.stringify({ cwd: '/your/project', prompt: '帮我重构 src/index.js' }),
+}).then((res) => res.json())
+
+console.log(response)
+```
+
+---
 
 ## 快速开始
 
@@ -33,71 +79,56 @@ npm install -g @claude-web/server
 
 **2. 启动服务**
 
-可以在任意目录下通过`claude-web start`启动服务：
-
 ```bash
 claude-web start
 
 → server: http://127.0.0.1:8003
-→ docs: http://127.0.0.1:8003/docs
+→ docs:   http://127.0.0.1:8003/docs
 ```
 
-**3. REST API**
+**3. 打开 Web UI**
 
-Swagger: http://127.0.0.1:8003/docs
+访问 http://127.0.0.1:8003
 
-<img src="./image-2.png" style="margin:0 auto;width:700px;"/>
-
-1. 查看项目列表
-
-```bash
-curl 'http://127.0.0.1:8003/api/project'
-# [{"id":"0557d0720cf35f03","cwd":"/Users/daiwenqi/code/echo-bot","sessionCount":0,"updatedAt":0}]
-```
-
-2. 新建会话并发送第一条消息（向 `session/new` 发送消息即可自动创建会话，需传入 `cwd`）
-
-```bash
-curl -X POST 'http://127.0.0.1:8003/api/session/new/message' \
-  -H 'Content-Type: application/json' \
-  -d '{"cwd":"/Users/daiwenqi/code/echo-bot","prompt":"你好"}'
-```
-
-3. 向已有会话继续发送消息（阻塞模式，也支持 SSE 流式）
-
-```bash
-# 阻塞模式：等待 Claude 完成后一次性返回结果
-curl -X POST 'http://127.0.0.1:8003/api/session/<sessionId>/message' \
-  -H 'Content-Type: application/json' \
-  -d '{"prompt":"请帮我列出项目结构"}'
-
-# SSE 流式：实时接收 Claude 的输出
-curl -X POST 'http://127.0.0.1:8003/api/session/<sessionId>/message' \
-  -H 'Content-Type: application/json' \
-  -H 'Accept: text/event-stream' \
-  -d '{"prompt":"请帮我列出项目结构"}'
-```
-
-## Web 界面
-
-通过 http://127.0.0.1:8003 进入页面，首页显示所有项目，点击某个项目后可以：
-
-- 与 Claude 多轮对话（流式输出）
-- 查看项目文件（语法高亮）
-- 打开交互式终端
-
-### 项目主页
+首页显示所有已链接的项目：
 
 <img src="./image.png" style="margin:0 auto;width:700px;"/>
 
-### 会话页
+点击项目后进入会话页：
 
 <img src="./image-1.png" style="margin:0 auto;width:700px;"/>
 
+---
+
+## Web UI 特性
+
+#### 富文本输入框
+
+<image src="./preview3.gif" style="margin:0 auto;width:900px;"/>
+
+| 功能          | 说明                                                               |
+| ------------- | ------------------------------------------------------------------ |
+| `@` 文件引用  | 输入 `@` 搜索并引用项目内任意文件，路径自动注入到 prompt           |
+| `/` 斜杠命令  | `/init` 生成 CLAUDE.md、`/cost` 查看 Token 消耗、`/clear` 清空会话 |
+| 图片粘贴      | `Ctrl+V` / `Cmd+V` 直接粘贴截图，自动转 base64（多模态）           |
+| `Shift+Enter` | 换行而不触发发送                                                   |
+
+#### 内置终端
+
+连接到项目目录的交互式终端，无需切换窗口。
+
+## REST API
+
+完整文档：Swagger → http://127.0.0.1:8003/docs
+
+<img src="./image-2.png" style="margin:0 auto;width:700px;"/>
+
+---
+
 ## 详细文档
 
-- [packages/server/README.md](./packages/server/README.md) REST API 服务
-- [packages/web/README.md](./packages/web/README.md) web ui
+- [packages/server/README.md](./packages/server/README.md) — REST API 服务
+- [packages/web/README.md](./packages/web/README.md) — Web UI
 
 ## License
 
