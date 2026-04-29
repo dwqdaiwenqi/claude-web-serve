@@ -92,11 +92,11 @@ claude-web start
 
 首页显示所有已链接的项目：
 
-<img src="./image.png" style="margin:0 auto;width:700px;"/>
+<img src="./image.png" style="margin:0 auto;width:900px;"/>
 
 点击项目后进入会话页：
 
-<img src="./image-1.png" style="margin:0 auto;width:700px;"/>
+<img src="./image-1.png" style="margin:0 auto;width:900px;"/>
 
 ---
 
@@ -121,7 +121,7 @@ claude-web start
 
 完整文档：Swagger → http://127.0.0.1:8003/docs
 
-<img src="./image-2.png" style="margin:0 auto;width:700px;"/>
+<img src="./image-2.png" style="margin:0 auto;width:900px;"/>
 
 ---
 
