@@ -144,6 +144,9 @@ export const api = {
       }
     }),
 
+  abortSession: (id: string): Promise<{ ok: boolean }> =>
+    fetch(`${BASE}/session/${id}/abort`, { method: 'POST' }).then((r) => r.json()),
+
   resolveApproval: (
     id: string,
     answers: Record<string, string>,

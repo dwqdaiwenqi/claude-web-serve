@@ -12,7 +12,7 @@ import {
   Input,
   Popover,
 } from 'antd'
-import { ArrowUpOutlined } from '@ant-design/icons'
+import { ArrowUpOutlined, XFilled } from '@ant-design/icons'
 import type { AskUserQuestion, SsePart } from '@/http/index'
 import type { SessionMessage } from '@/http/index'
 
@@ -260,6 +260,7 @@ interface ChatPanelProps {
   input: string
   onInputChange: (v: string) => void
   onSend: () => void
+  onAbort?: () => void
   onPasteImage: (file: File) => void
   activeProjectID: string | null
   pendingQuestion: AskUserQuestion[] | null
@@ -280,6 +281,7 @@ export default function ChatPanel({
   input,
   onInputChange,
   onSend,
+  onAbort,
   onPasteImage,
   activeProjectID,
   pendingQuestion,
@@ -416,14 +418,17 @@ export default function ChatPanel({
               </Space>
             </Tooltip>
 
-            <Button
-              color="primary"
-              variant="filled"
-              icon={<ArrowUpOutlined />}
-              onClick={onSend}
-              loading={loading}
-              disabled={!activeId || !input.trim()}
-            />
+            {loading ? (
+              <Button color="primary" variant="filled" icon={<XFilled />} onClick={onAbort} />
+            ) : (
+              <Button
+                color="primary"
+                variant="filled"
+                icon={<ArrowUpOutlined />}
+                onClick={onSend}
+                disabled={!activeId || !input.trim()}
+              />
+            )}
           </Space>
         </div>
       </div>

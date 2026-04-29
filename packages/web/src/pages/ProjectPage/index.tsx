@@ -295,10 +295,22 @@ export default function ProjectPage() {
     }
   }
 
-  async function handleResolve(answers: Record<string, string>, annotations?: Record<string, { preview?: string; notes?: string }>) {
+  async function handleResolve(
+    answers: Record<string, string>,
+    annotations?: Record<string, { preview?: string; notes?: string }>
+  ) {
     if (!pendingQuestion) return
     setPendingQuestion(null)
     await api.resolveApproval(pendingQuestion.sessionId, answers, annotations)
+  }
+
+  async function handleAbort() {
+    if (!activeId || activeId === NEW_SESSION_ID) return
+    try {
+      await api.abortSession(activeId)
+    } catch {
+      // ignore
+    }
   }
 
   async function sendMessage() {
@@ -396,7 +408,11 @@ export default function ProjectPage() {
           }
         },
         onError: (errMsg) => {
-          message.error(errMsg)
+          if (/aborted/.test(errMsg)) {
+            message.warning('已取消')
+          } else {
+            message.error(errMsg)
+          }
         },
       })
     } catch (err: unknown) {
@@ -585,6 +601,7 @@ export default function ProjectPage() {
                     input={input}
                     onInputChange={setInput}
                     onSend={sendMessage}
+                    onAbort={handleAbort}
                     onPasteImage={handlePasteImage}
                     activeProjectID={projectId ?? null}
                     pendingQuestion={pendingQuestion?.questions ?? null}

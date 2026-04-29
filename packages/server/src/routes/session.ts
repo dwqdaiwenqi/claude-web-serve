@@ -69,6 +69,17 @@ export async function sessionRoutes(api: FastifyInstance) {
     return { ok: true }
   })
 
+  // ── 中止正在运行的 Session ──────────────────────────────
+  api.post('/session/:id/abort', async (req: FastifyRequest, reply: FastifyReply) => {
+    const { id } = req.params as { id: string }
+    const runtime = getRuntimeSession(id)
+    if (!runtime) return reply.code(404).send({ error: 'Session not found' })
+    if (runtime.status !== 'busy') return reply.code(409).send({ error: 'Session is not busy' })
+    runtime.abort?.abort()
+    logger.info({ sessionId: id }, 'session aborted by user')
+    return { ok: true }
+  })
+
   // ── 重命名 Session ──────────────────────────────────────
   api.patch('/session/:id', async (req: FastifyRequest, _reply: FastifyReply) => {
     const { id } = req.params as { id: string }

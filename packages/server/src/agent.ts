@@ -111,6 +111,7 @@ function buildOptions(
     // 有已有 sessionId 则 resume，否则新建
     ...(runtime.sessionId ? { resume: runtime.sessionId } : {}),
     ...(bypassPermissions ? { permissionMode: 'bypassPermissions' } : { canUseTool }),
+    ...(runtime.abort ? { abortController: runtime.abort } : {}),
   }
 
   return options
@@ -213,6 +214,7 @@ export async function runAgent(
   const log = logger.child({ sessionId: (runtime.sessionId ?? 'new').slice(0, 12) })
   log.info({ prompt: plainText.slice(0, 80) }, 'agent start (blocking)')
   runtime.status = 'busy'
+  runtime.abort = new AbortController()
 
   const options = buildOptions(runtime, undefined, bypassPermissions)
   let cost: number | undefined
@@ -239,11 +241,16 @@ export async function runAgent(
       }
     }
   } catch (err: unknown) {
-    const errMsg = err instanceof Error ? err.message : String(err)
-    log.error({ err }, `agent error: ${errMsg}`)
+    if (err instanceof Error && err.name === 'AbortError') {
+      log.info('agent aborted by user')
+    } else {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      log.error({ err }, `agent error: ${errMsg}`)
+    }
     throw err
   } finally {
     runtime.status = 'idle'
+    runtime.abort = null
   }
 
   return { sessionId: runtime.sessionId, cost, tokens, messages }
@@ -269,6 +276,7 @@ export async function runAgentStream(
   const log = logger.child({ sessionId: (runtime.sessionId ?? 'new').slice(0, 12) })
   log.info({ prompt: plainText.slice(0, 80) }, 'agent start (stream)')
   runtime.status = 'busy'
+  runtime.abort = new AbortController()
 
   const writer = (ev: SseEvent) => sseWrite(reply, ev)
   const options = buildOptions(runtime, writer, bypassPermissions)
@@ -293,11 +301,17 @@ export async function runAgentStream(
       }
     }
   } catch (err: unknown) {
-    const errMsg = err instanceof Error ? err.message : String(err)
-    log.error({ err }, `agent error: ${errMsg}`)
-    sseWrite(reply, { event: 'error', data: { message: errMsg } })
+    if (err instanceof Error && err.name === 'AbortError') {
+      log.info('agent stream aborted by user')
+      sseWrite(reply, { event: 'error', data: { message: 'aborted' } })
+    } else {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      log.error({ err }, `agent error: ${errMsg}`)
+      sseWrite(reply, { event: 'error', data: { message: errMsg } })
+    }
   } finally {
     runtime.status = 'idle'
+    runtime.abort = null
   }
 
   sseWrite(reply, { event: 'done', data: { sessionId: runtime.sessionId, cost, tokens } })
