@@ -103,6 +103,8 @@ claude-web start
 
 <img src="./docs/image-1.png" style="margin:0 auto;width:900px;"/>
 
+<img src="./docs/diff.png" style="margin:0 auto;width:900px;"/>
+
 ---
 
 ## Web UI 特性
