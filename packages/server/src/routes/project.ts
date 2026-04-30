@@ -3,6 +3,25 @@ import fs from 'fs'
 import path from 'path'
 import { listSessions } from '@anthropic-ai/claude-agent-sdk'
 import { CLAUDE_PROJECTS_DIR } from '@/store'
+import { logger } from '@/logger'
+
+/**
+ * 规范化路径用于比较：统一用小写、正斜杠、去掉末尾斜杠
+ * Windows: C:\Users\foo → c:/users/foo
+ * Unix:    /Users/foo   → /users/foo  (保持首 /)
+ */
+function normalizePath(p: string): string {
+  return p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+}
+
+/**
+ * 安全检查：absPath 是否在 cwd 目录内（跨平台）
+ */
+function isPathInside(absPath: string, cwd: string): boolean {
+  const a = normalizePath(absPath)
+  const b = normalizePath(cwd)
+  return a === b || a.startsWith(b + '/')
+}
 
 /**
  * 将 project 目录名反推为真实路径。
@@ -11,32 +30,33 @@ import { CLAUDE_PROJECTS_DIR } from '@/store'
  * 找不到时降级读 .jsonl 里的 cwd 字段。
  */
 function dirNameToCwd(dirName: string): string {
-  // 去掉开头的 -，分割成 segments，第一个空串对应根 /
-  const segments = dirName.split('-')
-  // segments[0] 是空串（因为开头是 -），从 segments[1] 开始是路径段
-  // 用递归尝试所有合并方式，BFS 按路径深度（段数少 = 目录名段合并多）优先
-  const parts = segments.slice(1) // ['Users', 'daiwenqi', 'code', 'test', 'claude']
+  const parts = dirName.split('-').slice(1) // 去掉开头空串
 
-  function resolve(idx: number, current: string): string | null {
+  function tryResolve(idx: number, current: string): string | null {
     if (idx === parts.length) return fs.existsSync(current) ? current : null
-    // 尝试从 idx 开始，合并 1..n 个 parts 作为一个路径段
     let segment = ''
     for (let end = idx; end < parts.length; end++) {
       segment = segment ? segment + '-' + parts[end] : parts[end]
-      const next = current + '/' + segment
-      // 只有当前路径段存在时才继续递归（剪枝）
+      const next = path.join(current, segment)
       if (fs.existsSync(next)) {
-        const result = resolve(end + 1, next)
+        const result = tryResolve(end + 1, next)
         if (result !== null) return result
       }
     }
     return null
   }
 
-  const resolved = resolve(0, '')
-  if (resolved) return resolved
+  // Unix: 从根 / 开始搜索
+  const unixResult = tryResolve(0, '/')
+  if (unixResult) return unixResult
 
-  // 降级：读 .jsonl 里的 cwd
+  // Windows: 尝试常见盘符 C: D: E:
+  for (const drive of ['C', 'D', 'E', 'F']) {
+    const result = tryResolve(0, drive + ':' + path.sep)
+    if (result) return result
+  }
+
+  // 降级：读 .jsonl 里的 cwd 字段
   const dirPath = path.join(CLAUDE_PROJECTS_DIR, dirName)
   try {
     for (const file of fs.readdirSync(dirPath).filter((f) => f.endsWith('.jsonl'))) {
@@ -50,7 +70,8 @@ function dirNameToCwd(dirName: string): string {
     }
   } catch {}
 
-  return dirName.replace(/-/g, '/')
+  // 最终降级：用正斜杠拼出 Unix 风格路径
+  return '/' + parts.join('/')
 }
 
 export interface ProjectInfo {
@@ -136,13 +157,14 @@ export async function projectRoutes(api: FastifyInstance) {
   api.get('/project/:id/tree', async (req: FastifyRequest, reply: FastifyReply) => {
     const { id } = req.params as { id: string }
     const cwd = dirNameToCwd(id)
+    logger.debug({ id, cwd, exists: fs.existsSync(cwd) }, 'tree request')
     if (!fs.existsSync(cwd)) return reply.code(404).send({ error: 'Project not found' })
 
     const q = req.query as { path?: string }
     const relPath = q.path ?? '/'
-    const absPath = path.resolve(cwd, relPath.replace(/^\//, ''))
+    const absPath = path.resolve(cwd, relPath.replace(/^[/\\]/, ''))
 
-    if (!absPath.startsWith(cwd)) return reply.code(403).send({ error: 'Forbidden' })
+    if (!isPathInside(absPath, cwd)) return reply.code(403).send({ error: 'Forbidden' })
     if (!fs.existsSync(absPath)) return reply.code(404).send({ error: 'Path not found' })
 
     const IGNORE = new Set(['.git', 'node_modules', '.next', 'dist', '.cache', '.DS_Store'])
@@ -150,8 +172,14 @@ export async function projectRoutes(api: FastifyInstance) {
 
     function buildTree(dir: string, depth = 0): object[] {
       if (depth > 8) return []
-      return fs
-        .readdirSync(dir, { withFileTypes: true })
+      let entries
+      try {
+        entries = fs.readdirSync(dir, { withFileTypes: true })
+      } catch (err) {
+        logger.warn({ dir, err }, 'buildTree: readdirSync failed')
+        return []
+      }
+      return entries
         .filter((e) => !IGNORE.has(e.name) && !e.name.startsWith('.'))
         .sort((a, b) => {
           if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1
@@ -159,7 +187,7 @@ export async function projectRoutes(api: FastifyInstance) {
         })
         .map((e) => {
           const fullPath = path.join(dir, e.name)
-          const relToRoot = '/' + path.relative(root, fullPath)
+          const relToRoot = '/' + path.relative(root, fullPath).replace(/\\/g, '/')
           if (e.isDirectory()) {
             return {
               name: e.name,
@@ -186,8 +214,8 @@ export async function projectRoutes(api: FastifyInstance) {
     const q = req.query as { path?: string }
     if (!q.path) return reply.code(400).send({ error: 'path is required' })
 
-    const absPath = path.resolve(cwd, q.path.replace(/^\//, ''))
-    if (!absPath.startsWith(cwd)) return reply.code(403).send({ error: 'Forbidden' })
+    const absPath = path.resolve(cwd, q.path.replace(/^[/\\]/, ''))
+    if (!isPathInside(absPath, cwd)) return reply.code(403).send({ error: 'Forbidden' })
     if (!fs.existsSync(absPath)) return reply.code(404).send({ error: 'File not found' })
 
     const stat = fs.statSync(absPath)
@@ -207,8 +235,8 @@ export async function projectRoutes(api: FastifyInstance) {
     const q = req.query as { path?: string }
     if (!q.path) return reply.code(400).send({ error: 'path is required' })
 
-    const absPath = path.resolve(cwd, q.path.replace(/^\//, ''))
-    if (!absPath.startsWith(cwd)) return reply.code(403).send({ error: 'Forbidden' })
+    const absPath = path.resolve(cwd, q.path.replace(/^[/\\]/, ''))
+    if (!isPathInside(absPath, cwd)) return reply.code(403).send({ error: 'Forbidden' })
     if (!fs.existsSync(absPath)) return reply.code(404).send({ error: 'File not found' })
 
     const stat = fs.statSync(absPath)

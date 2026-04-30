@@ -6,10 +6,12 @@ export const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects'
 
 /**
  * 将文件系统路径转换为 claude cli 的 project 目录名
- * /Users/foo/bar → -Users-foo-bar
+ * Unix:    /Users/foo/bar   → -Users-foo-bar
+ * Windows: C:\Users\foo\bar → -C-Users-foo-bar
  */
 export function cwdToProjectDirName(cwd: string): string {
-  return cwd.replace(/\//g, '-')
+  // 统一分隔符为 /，再去掉盘符冒号（C: → C），最后把所有 / 替换为 -
+  return cwd.replace(/\\/g, '/').replace(/^([A-Za-z]):/, '$1').replace(/\//g, '-')
 }
 
 
