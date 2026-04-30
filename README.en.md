@@ -13,7 +13,7 @@ Wraps the [Claude Code Agent SDK](https://www.npmjs.com/package/@anthropic-ai/cl
 
 > **Prerequisite**: Claude Code CLI must be installed and logged in (`claude` command available)
 
-<image src="./preview1.gif" style="margin:0 auto;width:900px;"/>
+<image src="./docs/preview1.gif" style="margin:0 auto;width:900px;"/>
 
 ---
 
@@ -98,11 +98,11 @@ claude-web start
 
 Visit http://127.0.0.1:8003 — the home page lists all linked projects.
 
-<img src="./image.png" style="margin:0 auto;width:700px;"/>
+<img src="./docs/image.png" style="margin:0 auto;width:700px;"/>
 
 Click a project to open the session view:
 
-<img src="./image-1.png" style="margin:0 auto;width:700px;"/>
+<img src="./docs/image-1.png" style="margin:0 auto;width:700px;"/>
 
 ---
 
@@ -110,7 +110,7 @@ Click a project to open the session view:
 
 Full docs: Swagger → http://127.0.0.1:8003/docs
 
-<img src="./image-2.png" style="margin:0 auto;width:700px;"/>
+<img src="./docs/image-2.png" style="margin:0 auto;width:700px;"/>
 
 ### Core endpoints
 

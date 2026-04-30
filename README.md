@@ -13,7 +13,7 @@
 
 > **前提**：已安装并登录 Claude Code CLI（`claude` 命令可用）
 
-<image src="./preview1.gif" style="margin:0 auto;width:900px;"/>
+<image src="./docs/preview1.gif" style="margin:0 auto;width:900px;"/>
 
 ---
 
@@ -97,11 +97,11 @@ claude-web start
 
 首页显示所有已链接的项目：
 
-<img src="./image.png" style="margin:0 auto;width:900px;"/>
+<img src="./docs/image.png" style="margin:0 auto;width:900px;"/>
 
 点击项目后进入会话页：
 
-<img src="./image-1.png" style="margin:0 auto;width:900px;"/>
+<img src="./docs/image-1.png" style="margin:0 auto;width:900px;"/>
 
 ---
 
@@ -109,7 +109,7 @@ claude-web start
 
 #### 富文本输入框
 
-<image src="./preview3.gif" style="margin:0 auto;width:900px;"/>
+<image src="./docs/preview3.gif" style="margin:0 auto;width:900px;"/>
 
 | 功能          | 说明                                                               |
 | ------------- | ------------------------------------------------------------------ |
@@ -126,7 +126,7 @@ claude-web start
 
 完整文档：Swagger → http://127.0.0.1:8003/docs
 
-<img src="./image-2.png" style="margin:0 auto;width:900px;"/>
+<img src="./docs/image-2.png" style="margin:0 auto;width:900px;"/>
 
 ---
 
