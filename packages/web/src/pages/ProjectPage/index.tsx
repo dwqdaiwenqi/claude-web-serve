@@ -437,6 +437,8 @@ export default function ProjectPage() {
     )
   }
 
+  const isReviewPanel = rightPanel === 'review'
+
   return (
     <Layout
       className="projectPage"
@@ -646,18 +648,18 @@ export default function ProjectPage() {
                     }}
                   >
                     <Button
-                      color="default"
-                      variant={'filled'}
+                      color={isReviewPanel ? 'primary' : 'default'}
+                      variant={isReviewPanel ? 'filled' : 'text'}
                       size="small"
                       onClick={() => setRightPanel('review')}
                     >
-                      变更
+                      变更 {fileDiffs.length || ''}
                     </Button>
 
                     {selectedFile && (
                       <Button
-                        color="default"
-                        variant={'filled'}
+                        color={isReviewPanel ? 'default' : 'primary'}
+                        variant={isReviewPanel ? 'text' : 'filled'}
                         size="small"
                         icon={<FileOutlined style={{ fontSize: '10px' }} />}
                         onClick={() => setRightPanel('file')}
