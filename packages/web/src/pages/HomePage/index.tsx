@@ -294,7 +294,7 @@ export default function HomePage() {
         <>
           <div className="homePage-content">
             <div className="homePage-header">
-              <div className="homePage-header-title"></div>
+              <div className="homePage-header-title">Claude Web</div>
               <div
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
               >
