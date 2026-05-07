@@ -1,6 +1,6 @@
 {
   "name": "@claude-web/server",
-  "version": "0.1.42",
+  "version": "0.1.43",
   "description": "HTTP API server for Claude Code Agent SDK",
   "type": "module",
   "bin": {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Spin, App as AntdApp, Tooltip, Modal, Button } from 'antd'
+import { Spin, App as AntdApp, Tooltip, Modal, Button, Input } from 'antd'
 import {
   FolderOpenOutlined,
   BranchesOutlined,
@@ -235,6 +235,7 @@ export default function HomePage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedCwd, setSelectedCwd] = useState('')
   const [linking, setLinking] = useState(false)
+  const [search, setSearch] = useState('')
   const { message } = AntdApp.useApp()
 
   async function load(showLoading = false) {
@@ -312,6 +313,15 @@ export default function HomePage() {
                   添加项目
                 </Button>
               </div>
+              {projects.length > 0 && (
+                <Input.Search
+                  placeholder="筛选项目..."
+                  allowClear
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  style={{ margin: '10px 0 4px', width: isMobile ? '100%' : 300 }}
+                />
+              )}
               <div className="homePage-header-divider" />
             </div>
 
@@ -346,21 +356,36 @@ export default function HomePage() {
                   </Button>
                 </div>
               ) : (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-                    gap: 12,
-                  }}
-                >
-                  {projects.map((p) => (
-                    <ProjectCard
-                      key={p.id}
-                      project={p}
-                      onClick={() => navigate(`/project/${p.id}`)}
-                    />
-                  ))}
-                </div>
+                (() => {
+                  const filtered = search.trim()
+                    ? projects.filter((p) =>
+                        p.cwd.toLowerCase().includes(search.trim().toLowerCase())
+                      )
+                    : projects
+                  return filtered.length === 0 ? (
+                    <div
+                      style={{ textAlign: 'center', color: '#aaa', paddingTop: 40, fontSize: 13 }}
+                    >
+                      没有匹配的项目
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+                        gap: 12,
+                      }}
+                    >
+                      {filtered.map((p) => (
+                        <ProjectCard
+                          key={p.id}
+                          project={p}
+                          onClick={() => navigate(`/project/${p.id}`)}
+                        />
+                      ))}
+                    </div>
+                  )
+                })()
               )}
             </div>
           </div>
