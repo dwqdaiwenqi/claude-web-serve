@@ -69,6 +69,16 @@ export interface SsePart {
 export const api = {
   listProjects: (): Promise<ProjectInfo[]> => fetch(`${BASE}/project`).then((r) => r.json()),
 
+  linkProject: (cwd: string): Promise<{ ok: boolean; id: string; cwd: string } | { error: string }> =>
+    fetch(`${BASE}/project/link`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cwd }),
+    }).then((r) => r.json()),
+
+  listDirs: (dirPath?: string): Promise<{ path: string; dirs: { name: string; path: string }[] }> =>
+    fetch(`${BASE}/fs/dirs${dirPath ? `?path=${encodeURIComponent(dirPath)}` : ''}`).then((r) => r.json()),
+
   listProjectSessions: (projectID: string): Promise<SessionSummary[]> =>
     fetch(`${BASE}/project/${projectID}/session`).then((r) => r.json()),
 

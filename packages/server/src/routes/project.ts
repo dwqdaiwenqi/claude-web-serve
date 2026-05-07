@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import fs from 'fs'
 import path from 'path'
+import os from 'os'
 import { listSessions } from '@anthropic-ai/claude-agent-sdk'
 import { CLAUDE_PROJECTS_DIR } from '@/store'
 import { logger } from '@/logger'
@@ -94,32 +95,36 @@ async function listProjects(): Promise<ProjectInfo[]> {
     const dirPath = path.join(CLAUDE_PROJECTS_DIR, dirName)
 
     const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.jsonl'))
-    if (files.length === 0) continue
 
-    // 用 dirNameToCwd 作为 dir 参数调用 listSessions，从 session 元数据拿 cwd
     const fallbackCwd = dirNameToCwd(dirName)
     let cwd = fallbackCwd
     let updatedAt = 0
 
-    try {
-      const sessions = await listSessions({ dir: fallbackCwd })
-      // 取 lastModified 最大的 session 的 cwd
-      for (const s of sessions) {
-        if (s.lastModified > updatedAt) {
-          updatedAt = s.lastModified
-          if (s.cwd) cwd = s.cwd
+    if (files.length > 0) {
+      try {
+        const sessions = await listSessions({ dir: fallbackCwd })
+        for (const s of sessions) {
+          if (s.lastModified > updatedAt) {
+            updatedAt = s.lastModified
+            if (s.cwd) cwd = s.cwd
+          }
+        }
+      } catch {}
+
+      // listSessions 失败或没有 cwd 时，降级用文件 mtime
+      if (updatedAt === 0) {
+        for (const f of files) {
+          try {
+            const stat = fs.statSync(path.join(dirPath, f))
+            if (stat.mtimeMs > updatedAt) updatedAt = stat.mtimeMs
+          } catch {}
         }
       }
-    } catch {}
-
-    // listSessions 失败或没有 cwd 时，降级用文件 mtime
-    if (updatedAt === 0) {
-      for (const f of files) {
-        try {
-          const stat = fs.statSync(path.join(dirPath, f))
-          if (stat.mtimeMs > updatedAt) updatedAt = stat.mtimeMs
-        } catch {}
-      }
+    } else {
+      // 空目录（手动 link、尚未有会话），用目录 mtime
+      try {
+        updatedAt = fs.statSync(dirPath).mtimeMs
+      } catch {}
     }
 
     projects.push({ id: dirName, cwd, sessionCount: files.length, updatedAt })
@@ -131,6 +136,49 @@ async function listProjects(): Promise<ProjectInfo[]> {
 export async function projectRoutes(api: FastifyInstance) {
   // ── Project 列表 ────────────────────────────────────────
   api.get('/project', async () => listProjects())
+
+  // ── 浏览本机目录 ────────────────────────────────────────
+  api.get('/fs/dirs', async (req: FastifyRequest, reply: FastifyReply) => {
+    const q = req.query as { path?: string }
+    const dirPath = q.path ?? os.homedir()
+
+    if (!fs.existsSync(dirPath)) return reply.code(404).send({ error: 'Path not found' })
+    if (!fs.statSync(dirPath).isDirectory()) return reply.code(400).send({ error: 'Not a directory' })
+
+    let entries: { name: string; path: string }[] = []
+    try {
+      entries = fs.readdirSync(dirPath, { withFileTypes: true })
+        .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((e) => ({
+          name: e.name,
+          path: path.join(dirPath, e.name),
+        }))
+    } catch {
+      // 无权限的目录直接返回空
+    }
+
+    return { path: dirPath, dirs: entries }
+  })
+
+  // ── 添加项目（link 目录） ─────────────────────────────────
+  api.post('/project/link', async (req: FastifyRequest, reply: FastifyReply) => {
+    const body = (req.body ?? {}) as { cwd?: string }
+    const cwd = body.cwd?.trim()
+    if (!cwd) return reply.code(400).send({ error: 'cwd is required' })
+    if (!fs.existsSync(cwd)) return reply.code(400).send({ error: 'Directory does not exist' })
+    if (!fs.statSync(cwd).isDirectory()) return reply.code(400).send({ error: 'Path is not a directory' })
+
+    // 生成 project 目录名（与 CLI 保持一致：路径分隔符替换为 -）
+    const dirName = cwd.replace(/[/\\]+/g, '-').replace(/-$/, '') || '-'
+    const dirPath = path.join(CLAUDE_PROJECTS_DIR, dirName)
+
+    if (!fs.existsSync(CLAUDE_PROJECTS_DIR)) fs.mkdirSync(CLAUDE_PROJECTS_DIR, { recursive: true })
+    if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true })
+
+    logger.info({ cwd, dirName }, 'project linked')
+    return { ok: true, id: dirName, cwd }
+  })
 
   // ── Project sessions ────────────────────────────────────
   api.get('/project/:id/session', async (req: FastifyRequest, reply: FastifyReply) => {
