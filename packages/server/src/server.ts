@@ -43,14 +43,24 @@ export async function startServer(opts: ServerOptions = {}): Promise<void> {
     routePrefix: '/docs',
   })
 
+  // 静态资源、favicon、健康检查 → debug；API → info；错误 → warn
+  const STATIC_RE = /\.(js|css|html|ico|png|jpg|jpeg|gif|webp|svg|woff2?|ttf|map)(\?.*)?$/i
+  function reqLevel(url: string, code: number): 'debug' | 'info' | 'warn' {
+    if (code >= 400) return 'warn'
+    if (STATIC_RE.test(url) || url === '/health' || url === '/api/health') return 'debug'
+    return 'info'
+  }
+
   app.addHook('onRequest', (req, _reply, done) => {
-    logger.info(`\x1b[36m→ ${req.method} ${req.url}\x1b[0m`)
+    const lvl = STATIC_RE.test(req.url) ? 'debug' : 'info'
+    logger[lvl](`\x1b[36m→ ${req.method} ${req.url}\x1b[0m`)
     done()
   })
   app.addHook('onSend', (req, reply, payload, done) => {
     const code = reply.statusCode
+    const lvl = reqLevel(req.url, code)
     const color = code >= 500 ? '\x1b[31m' : code >= 400 ? '\x1b[33m' : '\x1b[32m'
-    logger.info(`${color}← ${req.method} ${req.url} ${code}\x1b[0m`)
+    logger[lvl](`${color}← ${req.method} ${req.url} ${code}\x1b[0m`)
     if (logger.isLevelEnabled('debug') && typeof payload === 'string') {
       try {
         const parsed = JSON.parse(payload)
