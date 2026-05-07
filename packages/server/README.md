@@ -153,7 +153,7 @@ curl -X POST 'http://127.0.0.1:8003/api/session/new/message' \
 {
   "content": [
     { "type": "text", "text": "这张图里有什么？" },
-    { "type": "image", "mediaType": "image/png", "data": "<base64>" }
+    { "type": "image", "media_type": "image/png", "data": "<base64>" }
   ]
 }
 ```

@@ -151,21 +151,62 @@ function ToolCallBlock({ block }: { block: any }) {
 
 function ToolResultBlock({ block }: { block: any }) {
   const { token } = theme.useToken()
-  const content = Array.isArray(block.content)
-    ? block.content.map((x: any) => x.text ?? '').join('')
-    : String(block.content ?? block.text ?? '')
-  if (!content) return null
+
+  // block.content 有三种形态：
+  // 1. 数组：混合内容块（文字+图片），来自 tool_result 或用户输入
+  // 2. 字符串：旧格式兼容，直接包一层
+  // 3. block.text：部分旧消息直接挂 text 字段
+  let items: any[]
+  if (Array.isArray(block.content)) {
+    items = block.content
+  } else if (typeof block.content === 'string') {
+    items = [{ type: 'text', text: block.content }]
+  } else if (block.text) {
+    items = [{ type: 'text', text: block.text }]
+  } else {
+    items = []
+  }
+
+  if (items.length === 0) return null
+
   return (
-    <div
-      style={{
-        fontSize: 14,
-        color: token.colorText,
-        padding: '2px 0 2px 18px',
-        wordBreak: 'break-all',
-      }}
-    >
-      {content.slice(0, 500)}
-      {content.length > 500 ? '…' : ''}
+    <div style={{ padding: '2px 0 2px 18px' }}>
+      {items.map((item: any, i: number) => {
+        if (item.type === 'image') {
+          // 两种图片格式：
+          // - source 嵌套：来自 SDK 回传的 tool_result（{ source: { type, media_type, data } }）
+          // - 扁平格式：来自前端 buildContent 组装的用户输入（{ media_type, data }）
+          let src: string | null = null
+          if (item.source?.type === 'base64') {
+            src = `data:${item.source.media_type};base64,${item.source.data}`
+          } else if (item.data) {
+            src = `data:${item.media_type};base64,${item.data}`
+          }
+          if (!src) return null
+          return (
+            <img
+              key={i}
+              src={src}
+              style={{
+                maxWidth: '100%',
+                maxHeight: 240,
+                borderRadius: 4,
+                display: 'block',
+                marginTop: 4,
+              }}
+            />
+          )
+        }
+
+        const text = String(item.text ?? '')
+        if (!text) return null
+        return (
+          <span key={i} style={{ fontSize: 13, color: token.colorText, wordBreak: 'break-all' }}>
+            {text.slice(0, 500)}
+            {text.length > 500 ? '…' : ''}
+          </span>
+        )
+      })}
     </div>
   )
 }
@@ -175,6 +216,8 @@ function SdkMessageView({ m }: { m: SessionMessage }) {
   const content: any[] = Array.isArray(msg?.content) ? msg.content : []
 
   const { token } = theme.useToken()
+
+  // console.log('content', content, 'type', m.type)
 
   if (m.type === 'assistant') {
     return (
@@ -206,14 +249,7 @@ function SdkMessageView({ m }: { m: SessionMessage }) {
   if (m.type === 'user') {
     return (
       <>
-        {/* {content.map((b, i) => {
-          if (b.type === 'tool_result') return <ToolResultBlock key={i} block={b} />
-          return null
-        })} */}
-
-        {content.map((b, i) => {
-          return <ToolResultBlock key={i} block={b} />
-        })}
+        <ToolResultBlock block={{ content }} />
       </>
     )
   }
