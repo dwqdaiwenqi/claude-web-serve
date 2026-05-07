@@ -12,9 +12,19 @@ import {
   Spin,
   App as AntdApp,
   Splitter,
+  Drawer,
+  Tabs,
 } from 'antd'
 import type { TreeDataNode } from 'antd'
-import { PlusOutlined, DeleteOutlined, FileOutlined, HomeOutlined } from '@ant-design/icons'
+import {
+  PlusOutlined,
+  DeleteOutlined,
+  FileOutlined,
+  HomeOutlined,
+  MenuOutlined,
+} from '@ant-design/icons'
+
+
 import {
   api,
   type SessionSummary,
@@ -31,6 +41,7 @@ import FullSpin from '@/components/FullSpin'
 import DiffReview, { type FileDiff } from '@/components/DiffReview/index.tsx'
 import { mergeDiffs, extractDiffsFromMessages } from '@/components/DiffReview/utils'
 import { isMediaFile } from '@/utils/file'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import './index.less'
 
 const { Text } = Typography
@@ -57,6 +68,7 @@ export default function ProjectPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
   const { message } = AntdApp.useApp()
+  const isMobile = useIsMobile()
 
   const [projectCwd, setProjectCwd] = useState<string>('')
   const [sessions, setSessions] = useState<SessionSummary[]>([])
@@ -76,6 +88,8 @@ export default function ProjectPage() {
   const [fileLoading, setFileLoading] = useState(false)
   const [treeSearch, setTreeSearch] = useState('')
   const [bypassPermissions, setBypassPermissions] = useState(true)
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
+  const [mobileTab, setMobileTab] = useState<'chat' | 'review'>('chat')
   const [pendingQuestion, setPendingQuestion] = useState<{
     sessionId: string
     questions: AskUserQuestion[]
@@ -439,6 +453,253 @@ export default function ProjectPage() {
 
   const isReviewPanel = rightPanel === 'review'
 
+  const renderSessionList = (onSelect?: () => void) => (
+    <>
+      <div
+        style={{
+          padding: '10px 10px 8px',
+          borderBottom: `1px solid ${C.bg3}`,
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ marginBottom: 8, paddingLeft: 2 }}>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: C.text0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {projectCwd.split('/').pop()}
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              color: C.text1,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              marginTop: 1,
+            }}
+          >
+            ~/{projectCwd.split('/').slice(-2, -1)[0]}
+          </div>
+        </div>
+        <Button
+          icon={<PlusOutlined />}
+          block
+          type="dashed"
+          onClick={() => {
+            startNewSession()
+            onSelect?.()
+          }}
+          style={{ borderRadius: 6, fontWeight: 500 }}
+        >
+          新建会话
+        </Button>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+        <List
+          dataSource={sessions}
+          renderItem={(s) => (
+            <List.Item
+              onClick={() => {
+                if (s.id !== NEW_SESSION_ID) {
+                  selectSession(s.id)
+                  onSelect?.()
+                }
+              }}
+              style={{
+                cursor: 'pointer',
+                padding: '6px 10px',
+                background: s.id === activeId ? C.bg1 : 'transparent',
+                borderRadius: 6,
+                margin: '1px 6px',
+                boxShadow: s.id === activeId ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all 0.1s',
+                border: 'none',
+              }}
+              actions={[
+                <Popconfirm key="del" title="删除此会话？" onConfirm={() => deleteSession(s.id)}>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    danger
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </Popconfirm>,
+              ]}
+            >
+              <List.Item.Meta
+                title={
+                  <Space size={4}>
+                    <Text
+                      ellipsis
+                      style={{
+                        maxWidth: 110,
+                        fontSize: 12.5,
+                        color: s.id === activeId ? C.text0 : C.text1,
+                      }}
+                    >
+                      {s.title}
+                    </Text>
+                    {s.status === 'busy' && (
+                      <Tag
+                        color="orange"
+                        style={{ fontSize: 10, padding: '0 3px', lineHeight: '15px' }}
+                      >
+                        运行中
+                      </Tag>
+                    )}
+                  </Space>
+                }
+              />
+            </List.Item>
+          )}
+        />
+      </div>
+    </>
+  )
+
+  // ── Mobile layout ───────────────────────────────────────────────────────────
+  if (isMobile) {
+    return (
+      <Layout
+        className="projectPage"
+        style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: C.bg0 }}
+      >
+        {preLoading && <FullSpin />}
+
+        {!preLoading && (
+          <>
+            {/* Session drawer */}
+            <Drawer
+              title={null}
+              placement="left"
+              open={mobileDrawerOpen}
+              onClose={() => setMobileDrawerOpen(false)}
+              width={'85%'}
+              closable={false}
+              styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column' } }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '10px 12px',
+                    borderBottom: `1px solid ${C.bg3}`,
+                  }}
+                >
+                  <HomeOutlined
+                    style={{ color: C.text1, cursor: 'pointer', fontSize: 15 }}
+                    onClick={() => navigate('/')}
+                  />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: C.text0 }}>会话列表</span>
+                </div>
+                {renderSessionList(() => setMobileDrawerOpen(false))}
+              </div>
+            </Drawer>
+
+            {/* Top bar */}
+            <div
+              style={{
+                height: 44,
+                background: C.bg1,
+                borderBottom: `1px solid ${C.bg3}`,
+                display: 'flex',
+                alignItems: 'center',
+                padding: '0 12px',
+                gap: 10,
+                flexShrink: 0,
+              }}
+            >
+              <Button
+                type="text"
+                icon={<MenuOutlined />}
+                onClick={() => setMobileDrawerOpen(true)}
+                style={{ padding: '0 6px' }}
+              />
+              <span
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: C.text0,
+                  flex: 1,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {activeSession?.title ?? projectCwd.split('/').pop()}
+              </span>
+              {activeSession?.status === 'busy' && (
+                <Tag color="orange" style={{ fontSize: 10, padding: '0 4px' }}>
+                  运行中
+                </Tag>
+              )}
+            </div>
+
+            {/* Tab bar */}
+            <Tabs
+              activeKey={mobileTab}
+              onChange={(k) => setMobileTab(k as 'chat' | 'review')}
+              size="small"
+              style={{ flexShrink: 0, background: C.bg1, paddingLeft: 12 }}
+              items={[
+                { key: 'chat', label: '会话' },
+                {
+                  key: 'review',
+                  label: `${fileDiffs.length ? fileDiffs.length + ' 个' : ''}文件变更`,
+                },
+              ]}
+            />
+
+            {/* Content */}
+            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              {mobileTab === 'chat' ? (
+                <ChatPanel
+                  activeId={activeId}
+                  sessionTitle={activeSession?.title}
+                  messages={messages}
+                  msgLoading={msgLoading}
+                  loading={loading}
+                  input={input}
+                  onInputChange={setInput}
+                  onSend={sendMessage}
+                  onAbort={handleAbort}
+                  onPasteImage={handlePasteImage}
+                  activeProjectID={projectId ?? null}
+                  pendingQuestion={pendingQuestion?.questions ?? null}
+                  onResolve={handleResolve}
+                  bypassPermissions={bypassPermissions}
+                  onBypassPermissionsChange={setBypassPermissions}
+                />
+              ) : (
+                <div
+                  style={{
+                    flex: 1,
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    background: C.bg1,
+                  }}
+                >
+                  <DiffReview diffs={fileDiffs} />
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </Layout>
+    )
+  }
+
   return (
     <Layout
       className="projectPage"
@@ -489,109 +750,7 @@ export default function ProjectPage() {
                     overflow: 'hidden',
                   }}
                 >
-                  <div
-                    style={{
-                      padding: '10px 10px 8px',
-                      borderBottom: `1px solid ${C.bg3}`,
-                      flexShrink: 0,
-                    }}
-                  >
-                    <div style={{ marginBottom: 8, paddingLeft: 2 }}>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: C.text0,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {projectCwd.split('/').pop()}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: C.text1,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          marginTop: 1,
-                        }}
-                      >
-                        ~/{projectCwd.split('/').slice(-2, -1)[0]}
-                      </div>
-                    </div>
-                    <Button
-                      icon={<PlusOutlined />}
-                      block
-                      type="dashed"
-                      onClick={startNewSession}
-                      style={{ borderRadius: 6, fontWeight: 500 }}
-                    >
-                      新建会话
-                    </Button>
-                  </div>
-                  <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
-                    <List
-                      dataSource={sessions}
-                      renderItem={(s) => (
-                        <List.Item
-                          onClick={() => s.id !== NEW_SESSION_ID && selectSession(s.id)}
-                          style={{
-                            cursor: 'pointer',
-                            padding: '6px 10px',
-                            background: s.id === activeId ? C.bg1 : 'transparent',
-                            borderRadius: 6,
-                            margin: '1px 6px',
-                            boxShadow: s.id === activeId ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                            transition: 'all 0.1s',
-                            border: 'none',
-                          }}
-                          actions={[
-                            <Popconfirm
-                              key="del"
-                              title="删除此会话？"
-                              onConfirm={() => deleteSession(s.id)}
-                            >
-                              <Button
-                                type="text"
-                                size="small"
-                                icon={<DeleteOutlined />}
-                                danger
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            </Popconfirm>,
-                          ]}
-                        >
-                          <List.Item.Meta
-                            title={
-                              <Space size={4}>
-                                <Text
-                                  ellipsis
-                                  style={{
-                                    maxWidth: 110,
-                                    fontSize: 12.5,
-                                    color: s.id === activeId ? C.text0 : C.text1,
-                                  }}
-                                >
-                                  {s.title}
-                                </Text>
-                                {s.status === 'busy' && (
-                                  <Tag
-                                    color="orange"
-                                    style={{ fontSize: 10, padding: '0 3px', lineHeight: '15px' }}
-                                  >
-                                    运行中
-                                  </Tag>
-                                )}
-                              </Space>
-                            }
-                          />
-                        </List.Item>
-                      )}
-                    />
-                  </div>
+                  {renderSessionList()}
                 </Splitter.Panel>
 
                 {/* 聊天主区 */}

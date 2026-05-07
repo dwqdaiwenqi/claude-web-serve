@@ -13,6 +13,7 @@ import {
 import { api, type ProjectInfo } from '@/http/index'
 import TerminalPanel from '@/components/Terminal/index.tsx'
 import FullSpin from '@/components/FullSpin'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import './index.less'
 
 function timeAgo(ts: number): string {
@@ -228,6 +229,7 @@ function DirPicker({ selected, onSelect }: { selected: string; onSelect: (path: 
 // ── 主页 ────────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const [projects, setProjects] = useState<ProjectInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -363,18 +365,22 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="homePage-divider" />
+          {!isMobile && (
+            <>
+              <div className="homePage-divider" />
 
-          <div className="homePage-terminal">
-            <TerminalPanel
-              welcomeMessage={[
-                '\x1b[1;36m╔══════════════════════════════════════════════════╗\x1b[0m\r\n',
-                '\x1b[1;36m║         欢迎使用 Claude Web  🤖                  ║\x1b[0m\r\n',
-                '\x1b[1;36m╚══════════════════════════════════════════════════╝\x1b[0m\r\n',
-                '\r\n',
-              ].join('')}
-            />
-          </div>
+              <div className="homePage-terminal">
+                <TerminalPanel
+                  welcomeMessage={[
+                    '\x1b[1;36m╔══════════════════════════════════════════════════╗\x1b[0m\r\n',
+                    '\x1b[1;36m║         欢迎使用 Claude Web  🤖                  ║\x1b[0m\r\n',
+                    '\x1b[1;36m╚══════════════════════════════════════════════════╝\x1b[0m\r\n',
+                    '\r\n',
+                  ].join('')}
+                />
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
