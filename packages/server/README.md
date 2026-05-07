@@ -160,17 +160,17 @@ curl -X POST 'http://127.0.0.1:8003/api/session/new/message' \
 
 **`options` 字段说明：**
 
-| 字段                   | 类型                                     | 说明                                               |
-| ---------------------- | ---------------------------------------- | -------------------------------------------------- |
-| `model`                | `string`                                 | 指定模型（如 `claude-opus-4-6`、`claude-haiku-4-5-20251001`） |
-| `maxTurns`             | `number`                                 | 限制 agent 最大轮次，防止无限循环                  |
-| `systemPrompt`         | `string`                                 | 追加自定义 system prompt                           |
-| `allowedTools`         | `string[]`                               | 覆盖默认工具白名单                                 |
-| `maxBudgetUsd`         | `number`                                 | 限制单次最大花费（美元）                           |
-| `effort`               | `'low'｜'medium'｜'high'｜'xhigh'｜'max'` | 控制响应质量 vs 速度                               |
-| `additionalDirectories`| `string[]`                               | 允许 agent 访问的额外目录（项目目录之外）          |
-| `env`                  | `Record<string, string>`                 | 注入到 agent 进程的环境变量                        |
-| `thinking`             | `{ type: 'enabled', budget_tokens: number }` | 开启扩展思考模式                              |
+| 字段                    | 类型                                         | 说明                                                          |
+| ----------------------- | -------------------------------------------- | ------------------------------------------------------------- |
+| `model`                 | `string`                                     | 指定模型（如 `claude-opus-4-6`、`claude-haiku-4-5-20251001`） |
+| `maxTurns`              | `number`                                     | 限制 agent 最大轮次，防止无限循环                             |
+| `systemPrompt`          | `string`                                     | 追加自定义 system prompt                                      |
+| `allowedTools`          | `string[]`                                   | 覆盖默认工具白名单                                            |
+| `maxBudgetUsd`          | `number`                                     | 限制单次最大花费（美元）                                      |
+| `effort`                | `'low'｜'medium'｜'high'｜'xhigh'｜'max'`    | 控制响应质量 vs 速度                                          |
+| `additionalDirectories` | `string[]`                                   | 允许 agent 访问的额外目录（项目目录之外）                     |
+| `env`                   | `Record<string, string>`                     | 注入到 agent 进程的环境变量                                   |
+| `thinking`              | `{ type: 'enabled', budget_tokens: number }` | 开启扩展思考模式                                              |
 
 > **注**：安全相关字段（`permissionMode`、`abortController`）由服务端固定，不会被 `options` 覆盖。
 
@@ -188,22 +188,53 @@ curl -X POST 'http://127.0.0.1:8003/api/session/<sessionId>/message' \
   -d '{"prompt":"请解释一下 package.json"}'
 ```
 
-**SSE 流式模式** — 加 `Accept: text/event-stream` 头或 `?stream=1`，实时推送内容：
+返回结构：
+
+```json
+{
+  "sessionId": "xxxxxxxx",
+  "messages": [
+    { "type": "assistant", "message": {} },
+    { "type": "assistant", "message": {} },
+    { "type": "user", "message": {} }
+    // ...
+  ],
+  "tokens": { "input": 100, "output": 200, "cache": { "read": 0, "write": 0 } }
+}
+```
+
+**SSE 流式模式** — 加 `Accept: text/event-stream` 头或 `?stream=1`，消息实时逐条推送：
 
 ```bash
-curl -X POST 'http://127.0.0.1:8003/api/session/<sessionId>/message?stream=1' \
+curl -N -X POST 'http://127.0.0.1:8003/api/session/<sessionId>/message?stream=1' \
   -H 'Content-Type: application/json' \
+  -H 'Accept: text/event-stream' \
   -d '{"prompt":"帮我写一个 README"}'
+```
+
+**返回数据流**
+
+```
+event: message
+data: {"type":"assistant","message":{...}}
+
+event: message
+data: {"type":"user","message":{...}}
+
+// ...
+
+event: done
+data: {"sessionId":"xxx","cost":0.001,"tokens":{...}}
 ```
 
 **SSE 事件类型：**
 
-| 事件       | data 格式                                                 | 说明                                          |
-| ---------- | --------------------------------------------------------- | --------------------------------------------- |
-| `message`  | `{ type, uuid, session_id, message, parent_tool_use_id }` | SDK 原始消息（文本 / 工具调用 / 工具结果）    |
-| `done`     | `{ sessionId, cost, tokens }`                             | Agent 完成，含费用与 token 用量（含缓存细分） |
-| `error`    | `{ message: string }`                                     | 执行出错或被中止                              |
-| `ask_user` | `{ questions: [...] }`                                    | Agent 触发 AskUserQuestion，等待客户端回答    |
+| 事件       | data 格式                                                 | 说明                                                 |
+| ---------- | --------------------------------------------------------- | ---------------------------------------------------- |
+| `message`  | `{ type, uuid, session_id, message, parent_tool_use_id }` | SDK 原始消息（文本 / 工具调用 / 工具结果），会来多次 |
+| `done`     | `{ sessionId, cost, tokens }`                             | Agent 完成，含费用与 token 用量，只来一次            |
+| `error`    | `{ message: string }`                                     | 执行出错或被中止                                     |
+| `ask_user` | `{ questions: [...] }`                                    | Agent 触发 AskUserQuestion，等待客户端回答           |
 
 **处理 `ask_user`：** 收到事件后，调用 resolve 接口提交答案，Agent 才会继续执行：
 

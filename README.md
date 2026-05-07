@@ -39,37 +39,124 @@
 
 ---
 
-### 用任意语言调用 Claude Code
+## 用任意语言调用 Claude Code
 
-用 curl / Python 直接发 HTTP 请求：
+### 阻塞模式
+
+等待 Agent 完全执行后一次性返回所有消息。
 
 ```bash
-# 新建会话，让 Claude 帮你分析代码
-curl -X POST 'http://127.0.0.1:8003/api/session/new/message' \
-  -H 'Content-Type: application/json' \
-  -d '{"cwd":"/your/project","prompt":"帮我找出这个项目里所有潜在的内存泄漏"}'
+curl -X POST http://127.0.0.1:8003/api/session/new/message \
+  -H "Content-Type: application/json" \
+  -d '{"cwd": "/your/project", "prompt": "看看项目的架构"}'
 ```
 
+**返回结构**
+
+```js
+{
+  "sessionId": "xxxxxxxx",
+  "messages": [
+    { "type": "assistant", "message": {} },
+    { "type": "assistant", "message": {} },
+    { "type": "user", "message": {} }
+    // ...
+  ],
+  "tokens": { "input": 100, "output": 200, "cache": { "read": 0, "write": 0 } }
+}
+```
+
+**Python**
+
 ```python
-# Python 示例
-import requests, json
+import requests
 
 resp = requests.post("http://127.0.0.1:8003/api/session/new/message", json={
     "cwd": "/your/project",
-    "prompt": "帮我写完整的单元测试覆盖 src/utils.py"
+    "prompt": "看看项目的架构",
 })
 print(resp.json()["messages"][-1])
 ```
 
-```js
-// Node.js 示例
-const response = await fetch('http://127.0.0.1:8003/api/session/new/message', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-  body: JSON.stringify({ cwd: '/your/project', prompt: '帮我重构 src/index.js' }),
-}).then((res) => res.json())
+**Node.js**
 
-console.log(response)
+```js
+const res = await fetch('http://127.0.0.1:8003/api/session/new/message', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ cwd: '/your/project', prompt: '看看项目的架构' }),
+}).then((r) => r.json())
+
+console.log(res.messages)
+```
+
+---
+
+### 非阻塞模式（SSE）
+
+加 `?stream=1` 和 `Accept: text/event-stream` 请求头，消息实时逐条推送。
+
+```bash
+curl -N -X POST "http://127.0.0.1:8003/api/session/new/message?stream=1" \
+  -H "Content-Type: application/json" \
+  -H "Accept: text/event-stream" \
+  -d '{"cwd": "/your/project", "prompt": "看看项目的架构"}'
+```
+
+**返回数据流**
+
+```
+event: message
+data: {"type":"assistant","message":{...}}
+
+event: message
+data: {"type":"user","message":{...}}
+
+// ...
+
+event: done
+data: {"sessionId":"xxx","cost":0.001,"tokens":{...}}
+```
+
+- `message` 事件：每产生一条 assistant 消息或工具调用结果就推送一次，会来多次
+- `done` 事件：Agent 执行完毕时发送一次，携带 sessionId 和费用信息，之后连接关闭
+
+**Node.js**（使用 [eventsource-parser](https://github.com/rexxars/eventsource-parser)）
+
+```js
+import { createParser } from 'eventsource-parser'
+
+const response = await fetch('http://127.0.0.1:8003/api/session/new/message?stream=1', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    Accept: 'text/event-stream',
+  },
+  body: JSON.stringify({ cwd: '/your/project', prompt: '看看项目的架构' }),
+})
+
+const parser = createParser({
+  onEvent(ev) {
+    const payload = JSON.parse(ev.data)
+    if (ev.event === 'message') {
+      const blocks = payload.message?.content ?? []
+      for (const block of blocks) {
+        if (block.type === 'text') process.stdout.write(block.text)
+      }
+    }
+    if (ev.event === 'done') {
+      console.log('\n[done]', `sessionId=${payload.sessionId}`, `cost=$${payload.cost?.toFixed(5)}`)
+    }
+  },
+})
+
+const reader = response.body.getReader()
+const decoder = new TextDecoder()
+while (true) {
+  const { done, value } = await reader.read()
+  if (done) break
+  parser.feed(decoder.decode(value, { stream: true }))
+}
 ```
 
 ---

@@ -39,41 +39,129 @@ Your code / scripts / workflows
 
 ---
 
-## Use Cases
+## Call Claude Code from any language
 
-### Case 1 — Call Claude Code from any language
+### Blocking mode
 
-Don't know TypeScript? No problem. Use curl or Python:
+Waits for the Agent to finish and returns all messages at once.
+
+**curl**
 
 ```bash
-# Start a session and ask Claude to analyze your code
-curl -X POST 'http://127.0.0.1:8003/api/session/new/message' \
-  -H 'Content-Type: application/json' \
-  -d '{"cwd":"/your/project","prompt":"Find all potential memory leaks in this project"}'
+curl -X POST http://127.0.0.1:8003/api/session/new/message \
+  -H "Content-Type: application/json" \
+  -d '{"cwd": "/your/project", "prompt": "Analyze the project architecture"}'
 ```
 
+**Response shape**
+
+```js
+{
+  "sessionId": "xxxxxxxx",
+  "messages": [
+    { "type": "assistant", "message": {} },
+    { "type": "assistant", "message": {} },
+    { "type": "user", "message": {} }
+    // ...
+  ],
+  "tokens": { "input": 100, "output": 200, "cache": { "read": 0, "write": 0 } }
+}
+```
+
+**Python**
+
 ```python
-# Python example
 import requests
 
 resp = requests.post("http://127.0.0.1:8003/api/session/new/message", json={
     "cwd": "/your/project",
-    "prompt": "Write full unit test coverage for src/utils.py"
+    "prompt": "Analyze the project architecture",
 })
 print(resp.json()["messages"][-1])
 ```
 
-### Case 2 — Plug into n8n / Dify / any AI workflow platform
+**Node.js**
 
-claude-web exposes a standard HTTP API, so it works as an HTTP Request node in n8n or a custom tool backend in Dify:
+```js
+const res = await fetch('http://127.0.0.1:8003/api/session/new/message', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ cwd: '/your/project', prompt: 'Analyze the project architecture' }),
+}).then((r) => r.json())
 
-- Automated Code Review (PR triggers → Claude reviews → comment posted back)
-- Scheduled audits (daily security scan across your repos)
-- Parallel multi-project processing
+console.log(res.messages)
+```
 
-### Case 3 — Shared Claude Code instance for a team
+---
 
-Run one claude-web server; team members hit the HTTP API or Web UI without each person needing a local Claude CLI setup.
+### Non-blocking mode (SSE)
+
+Add `?stream=1` or the `Accept: text/event-stream` header — messages are pushed one by one as they are produced.
+
+**curl**
+
+```bash
+curl -N -X POST "http://127.0.0.1:8003/api/session/new/message?stream=1" \
+  -H "Content-Type: application/json" \
+  -H "Accept: text/event-stream" \
+  -d '{"cwd": "/your/project", "prompt": "Analyze the project architecture"}'
+```
+
+**Event stream**
+
+```
+event: message
+data: {"type":"assistant","message":{...}}
+
+event: message
+data: {"type":"user","message":{...}}
+
+// ...
+
+event: done
+data: {"sessionId":"xxx","cost":0.001,"tokens":{...}}
+```
+
+- `message` events: pushed each time the agent produces a message or tool result — fires multiple times
+- `done` event: sent once when the agent finishes, carries `sessionId` and cost info; connection closes after
+
+**Node.js** (using [eventsource-parser](https://github.com/rexxars/eventsource-parser))
+
+```js
+import { createParser } from 'eventsource-parser'
+
+const response = await fetch('http://127.0.0.1:8003/api/session/new/message?stream=1', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    Accept: 'text/event-stream',
+  },
+  body: JSON.stringify({ cwd: '/your/project', prompt: 'Analyze the project architecture' }),
+})
+
+const parser = createParser({
+  onEvent(ev) {
+    const payload = JSON.parse(ev.data)
+    if (ev.event === 'message') {
+      const blocks = payload.message?.content ?? []
+      for (const block of blocks) {
+        if (block.type === 'text') process.stdout.write(block.text)
+      }
+    }
+    if (ev.event === 'done') {
+      console.log('\n[done]', `sessionId=${payload.sessionId}`, `cost=$${payload.cost?.toFixed(5)}`)
+    }
+  },
+})
+
+const reader = response.body.getReader()
+const decoder = new TextDecoder()
+while (true) {
+  const { done, value } = await reader.read()
+  if (done) break
+  parser.feed(decoder.decode(value, { stream: true }))
+}
+```
 
 ---
 
@@ -98,41 +186,13 @@ claude-web start
 
 Visit http://127.0.0.1:8003 — the home page lists all linked projects.
 
-<img src="./docs/image.png" style="margin:0 auto;width:700px;"/>
+<img src="./docs/image.png" style="margin:0 auto;width:900px;"/>
 
 Click a project to open the session view:
 
-<img src="./docs/image-1.png" style="margin:0 auto;width:700px;"/>
+<img src="./docs/image-1.png" style="margin:0 auto;width:900px;"/>
 
----
-
-## REST API
-
-Full docs: Swagger → http://127.0.0.1:8003/docs
-
-<img src="./docs/image-2.png" style="margin:0 auto;width:700px;"/>
-
-### Core endpoints
-
-```bash
-# List all projects
-GET  /api/project
-
-# Create a new session and send the first message (pass cwd to auto-create)
-POST /api/session/new/message
-  body: { "cwd": "/path/to/project", "prompt": "..." }
-
-# Continue an existing session (blocking)
-POST /api/session/:sessionId/message
-  body: { "prompt": "..." }
-
-# Continue an existing session (SSE streaming)
-POST /api/session/:sessionId/message
-  headers: Accept: text/event-stream
-  body: { "prompt": "..." }
-```
-
-SSE event types: `part` (incremental content) / `done` (finished + stats) / `error` / `ask_user` (tool interaction)
+<img src="./docs/diff.png" style="margin:0 auto;width:900px;"/>
 
 ---
 
@@ -140,7 +200,7 @@ SSE event types: `part` (incremental content) / `done` (finished + stats) / `err
 
 #### Rich text input
 
-<image src="./preview3.gif" style="margin:0 auto;width:900px;"/>
+<image src="./docs/preview3.gif" style="margin:0 auto;width:900px;"/>
 
 | Feature            | Description                                                                                       |
 | ------------------ | ------------------------------------------------------------------------------------------------- |
@@ -152,6 +212,12 @@ SSE event types: `part` (incremental content) / `done` (finished + stats) / `err
 #### Built-in terminal
 
 Interactive terminal attached to the project directory — no window switching needed.
+
+## REST API
+
+Full docs: Swagger → http://127.0.0.1:8003/docs
+
+<img src="./docs/image-2.png" style="margin:0 auto;width:900px;"/>
 
 ---
 
