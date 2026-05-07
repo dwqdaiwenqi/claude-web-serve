@@ -4,7 +4,7 @@ import wsPlugin from '@fastify/websocket'
 import staticPlugin from '@fastify/static'
 import swagger from '@fastify/swagger'
 import swaggerUi from '@fastify/swagger-ui'
-import { logger } from './logger'
+import { logger, logDir } from './logger'
 import { findAvailablePort, getBestLocalIP } from './utils'
 import { projectRoutes } from './routes/project'
 import { sessionRoutes } from './routes/session'
@@ -112,7 +112,7 @@ docs:
 → http://127.0.0.1:${availablePort}/docs
 → http://${localIP}:${availablePort}/docs`
     : ''
-  logger.info(`server started\n${urlLines}\n${docsLine}`)
+  logger.info(`server started\n${urlLines}\n${docsLine}\n\nlogs: ${logDir}`)
 
   if (process.env.NODE_ENV !== 'development') {
     const openUrl = `http://${localIP}:${availablePort}`

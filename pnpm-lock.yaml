@@ -47,6 +47,9 @@ importers:
       pino-pretty:
         specifier: ^13.1.3
         version: 13.1.3
+      pino-roll:
+        specifier: ^4.0.0
+        version: 4.0.0
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -83,7 +86,7 @@ importers:
         version: 6.0.0
       antd:
         specifier: ^5.24.0
-        version: 5.29.3(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        version: 5.29.3(date-fns@4.1.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       react:
         specifier: ^19.0.0
         version: 19.2.5
@@ -1233,6 +1236,9 @@ packages:
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
+  date-fns@4.1.0:
+    resolution: {integrity: sha512-Ukq0owbQXxa/U3EGtsdVBkR1w7KOQ5gIBqdH2hkvknzZPYvBxb/aa6E8L7tmjFtkwZBu3UXBbjIgPo/Ez4xaNg==}
+
   dateformat@4.6.3:
     resolution: {integrity: sha512-2P0p0pFGzHS5EMnhdxQi7aJN+iMheud0UhG4dlE1DLAlvL8JHjJJTX/CSm4JXwV0Ka5nGk3zC5mcb5bUQUxxMA==}
 
@@ -1906,6 +1912,9 @@ packages:
   pino-pretty@13.1.3:
     resolution: {integrity: sha512-ttXRkkOz6WWC95KeY9+xxWL6AtImwbyMHrL1mSwqwW9u+vLp/WIElvHvCSDg0xO/Dzrggz1zv3rN5ovTRVowKg==}
     hasBin: true
+
+  pino-roll@4.0.0:
+    resolution: {integrity: sha512-axI1aQaIxXdw1F4OFFli1EDxIrdYNGLowkw/ZoZogX8oCSLHUghzwVVXUS8U+xD/Savwa5IXpiXmsSGKFX/7Sg==}
 
   pino-std-serializers@7.1.0:
     resolution: {integrity: sha512-BndPH67/JxGExRgiX1dX0w1FvZck5Wa4aal9198SrRhZjH3GxKQUKIBnYJTdj2HDN3UQAS06HlfcSbQj2OHmaw==}
@@ -3552,7 +3561,7 @@ snapshots:
     dependencies:
       color-convert: 2.0.1
 
-  antd@5.29.3(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
+  antd@5.29.3(date-fns@4.1.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
     dependencies:
       '@ant-design/colors': 7.2.1
       '@ant-design/cssinjs': 1.24.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -3584,7 +3593,7 @@ snapshots:
       rc-motion: 2.9.5(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       rc-notification: 5.6.4(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       rc-pagination: 5.1.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      rc-picker: 4.11.3(dayjs@1.11.20)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      rc-picker: 4.11.3(date-fns@4.1.0)(dayjs@1.11.20)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       rc-progress: 4.0.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       rc-rate: 2.13.1(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       rc-resize-observer: 1.4.3(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -3769,6 +3778,8 @@ snapshots:
       which: 2.0.2
 
   csstype@3.2.3: {}
+
+  date-fns@4.1.0: {}
 
   dateformat@4.6.3: {}
 
@@ -4735,6 +4746,11 @@ snapshots:
       sonic-boom: 4.2.1
       strip-json-comments: 5.0.3
 
+  pino-roll@4.0.0:
+    dependencies:
+      date-fns: 4.1.0
+      sonic-boom: 4.2.1
+
   pino-std-serializers@7.1.0: {}
 
   pino@10.3.1:
@@ -4965,7 +4981,7 @@ snapshots:
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
 
-  rc-picker@4.11.3(dayjs@1.11.20)(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
+  rc-picker@4.11.3(date-fns@4.1.0)(dayjs@1.11.20)(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
     dependencies:
       '@babel/runtime': 7.29.2
       '@rc-component/trigger': 2.3.1(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -4976,6 +4992,7 @@ snapshots:
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
     optionalDependencies:
+      date-fns: 4.1.0
       dayjs: 1.11.20
 
   rc-progress@4.0.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
