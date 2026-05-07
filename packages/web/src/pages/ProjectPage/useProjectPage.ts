@@ -17,7 +17,7 @@ import { isMediaFile } from '@/utils/file'
 
 export interface ImageData {
   data: string
-  mediaType: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp'
+  media_type: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp'
 }
 
 export const NEW_SESSION_ID = 'new'
@@ -116,7 +116,13 @@ export function useProjectPage() {
     setSessions((prev) => {
       if (prev.some((s) => s.id === NEW_SESSION_ID)) return prev
       return [
-        { id: NEW_SESSION_ID, title: '新建会话', cwd: projectCwd, status: 'idle', lastModified: Date.now() },
+        {
+          id: NEW_SESSION_ID,
+          title: '新建会话',
+          cwd: projectCwd,
+          status: 'idle',
+          lastModified: Date.now(),
+        },
         ...prev,
       ]
     })
@@ -125,21 +131,27 @@ export function useProjectPage() {
   async function deleteSession(id: string) {
     if (id === NEW_SESSION_ID) {
       setSessions((prev) => prev.filter((s) => s.id !== NEW_SESSION_ID))
-      if (activeId === NEW_SESSION_ID) { setActiveId(null); setMessages([]) }
+      if (activeId === NEW_SESSION_ID) {
+        setActiveId(null)
+        setMessages([])
+      }
       return
     }
     await api.deleteSession(id)
     setSessions((prev) => prev.filter((s) => s.id !== id))
-    if (activeId === id) { setActiveId(null); setMessages([]) }
+    if (activeId === id) {
+      setActiveId(null)
+      setMessages([])
+    }
   }
 
   function handlePasteImage(file: File) {
     const reader = new FileReader()
     reader.onload = () => {
       const base64 = (reader.result as string).split(',')[1]
-      const mediaType = file.type as ImageData['mediaType']
+      const media_type = file.type as ImageData['media_type']
       const key = `[Image ${imageMap.size + 1}]`
-      setImageMap((prev) => new Map(prev).set(key, { data: base64, mediaType }))
+      setImageMap((prev) => new Map(prev).set(key, { data: base64, media_type: media_type }))
       setInput((prev) => prev + key)
     }
     reader.readAsDataURL(file)
@@ -155,7 +167,7 @@ export function useProjectPage() {
       const token = match[0]
       if (token.startsWith('[Image')) {
         const img = imageMap.get(token)
-        if (img) blocks.push({ type: 'image', mediaType: img.mediaType, data: img.data })
+        if (img) blocks.push({ type: 'image', media_type: img.media_type, data: img.data })
         else blocks.push({ type: 'text', text: token })
       } else {
         const filePath = token.match(/\(([^)]+)\)$/)?.[1]
@@ -183,7 +195,11 @@ export function useProjectPage() {
 
   async function handleAbort() {
     if (!activeId || activeId === NEW_SESSION_ID) return
-    try { await api.abortSession(activeId) } catch { /* ignore */ }
+    try {
+      await api.abortSession(activeId)
+    } catch {
+      /* ignore */
+    }
   }
 
   async function openFile(filePath: string) {
@@ -202,7 +218,6 @@ export function useProjectPage() {
       setFileLoading(false)
     }
   }
-
   async function sendMessage() {
     if (!input.trim() || !activeId || loading) return
     const raw = input.trim()
@@ -214,18 +229,22 @@ export function useProjectPage() {
     setLoading(true)
 
     const content = await buildContent(raw)
-    const previewText = content.map((b) => (b.type === 'text' ? b.text : '[图片]')).join('')
 
     const userSdkMsg: SessionMessage = {
       type: 'user',
       uuid: 'tmp_user',
       session_id: '',
       parent_tool_use_id: null,
-      message: { role: 'user', content: [{ type: 'text', text: previewText }] },
+      message: { role: 'user', content: content as any },
     }
+
     setMessages((prev) => [
       ...prev,
-      { id: Date.now().toString(), role: 'user' as DisplayMessage['role'], sdkMessages: [userSdkMsg] },
+      {
+        id: Date.now().toString(),
+        role: 'user' as DisplayMessage['role'],
+        sdkMessages: [userSdkMsg],
+      },
     ])
     setSessions((prev) =>
       prev.map((s) => (s.id === sessionId ? { ...s, status: 'busy' as const } : s))
@@ -247,12 +266,25 @@ export function useProjectPage() {
           setMessages((prev) => {
             if (sdkMsg.type === 'user') {
               const content: any[] = Array.isArray((sdkMsg.message as any)?.content)
-                ? (sdkMsg.message as any).content : []
+                ? (sdkMsg.message as any).content
+                : []
               if (!hasRealInput(content)) return prev
-              return [...prev, { id: sdkMsg.uuid, role: 'user' as DisplayMessage['role'], sdkMessages: [filterSdkMsg(sdkMsg)] }]
+              // 用真实消息替换临时的 tmp_user 占位
+              return prev.map((m) =>
+                m.id === 'tmp_user' || m.sdkMessages[0]?.uuid === 'tmp_user'
+                  ? { ...m, id: sdkMsg.uuid, sdkMessages: [filterSdkMsg(sdkMsg)] }
+                  : m
+              )
             } else if (sdkMsg.type === 'assistant') {
               if (!hasRealAssistantContent(sdkMsg)) return prev
-              return [...prev, { id: sdkMsg.uuid, role: 'assistant' as DisplayMessage['role'], sdkMessages: [sdkMsg] }]
+              return [
+                ...prev,
+                {
+                  id: sdkMsg.uuid,
+                  role: 'assistant' as DisplayMessage['role'],
+                  sdkMessages: [sdkMsg],
+                },
+              ]
             }
             return prev
           })
@@ -265,7 +297,10 @@ export function useProjectPage() {
             prev.map((s) => (s.id === realId ? { ...s, status: 'idle' as const } : s))
           )
           if (projectId) {
-            api.getFileTree(projectId).then((nodes) => setFileTree(toTreeData(nodes))).catch(() => {})
+            api
+              .getFileTree(projectId)
+              .then((nodes) => setFileTree(toTreeData(nodes)))
+              .catch(() => {})
           }
         },
         onError: (errMsg) => {
@@ -291,21 +326,34 @@ export function useProjectPage() {
       try {
         const projects = await api.listProjects()
         const p = projects.find((x) => x.id === projectId)
-        if (!p) { navigate('/'); return }
+        if (!p) {
+          navigate('/')
+          return
+        }
         setProjectCwd(p.cwd)
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       try {
         const ss = await api.listProjectSessions(projectId)
         setSessions(ss)
         if (ss.length > 0) selectSession(ss[0].id)
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       try {
         const nodes = await api.getFileTree(projectId)
         setFileTree(toTreeData(nodes))
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       setPreLoading(false)
     })()
   }, [projectId])
+
+  useEffect(() => {
+    console.log('messages', messages)
+  }, [messages])
 
   return {
     projectId,

@@ -8,7 +8,7 @@ export type IncomingBlock =
   | { type: 'text'; text: string }
   | {
       type: 'image'
-      mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
+      media_type: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
       data: string
     }
 
@@ -65,7 +65,7 @@ function buildSdkPrompt(content: IncomingBlock[], options: Record<string, unknow
     if (b.type === 'image') {
       return {
         type: 'image' as const,
-        source: { type: 'base64' as const, media_type: b.mediaType, data: b.data },
+        source: { type: 'base64' as const, media_type: b.media_type, data: b.data },
       }
     }
     return { type: 'text' as const, text: b.text }
@@ -133,7 +133,15 @@ function buildOptions(
 
   const options: Record<string, unknown> = {
     cwd: runtime.cwd,
-    allowedTools: allowedTools ?? ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'AskUserQuestion'],
+    allowedTools: allowedTools ?? [
+      'Read',
+      'Write',
+      'Edit',
+      'Glob',
+      'Grep',
+      'Bash',
+      'AskUserQuestion',
+    ],
     // 有已有 sessionId 则 resume，否则新建
     ...(runtime.sessionId ? { resume: runtime.sessionId } : {}),
     // 客户端可选参数
