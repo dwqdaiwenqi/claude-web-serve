@@ -186,11 +186,19 @@ claude-web start
 
 <img src="./docs/image.png" style="margin:0 auto;width:900px;"/>
 
+移动端：
+
+<img src="./docs/mobile-home.png" style="margin:0 auto;width:50%;min-width:400px;"/>
+
 点击项目后进入会话页：
 
 <img src="./docs/image-1.png" style="margin:0 auto;width:900px;"/>
 
 <img src="./docs/diff.png" style="margin:0 auto;width:900px;"/>
+
+移动端：
+
+<img src="./docs/mobile-chat.png" style="margin:0 auto;width:50%;min-width:400px;"/>
 
 ---
 
