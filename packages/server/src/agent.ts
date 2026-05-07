@@ -82,11 +82,25 @@ function buildSdkPrompt(content: IncomingBlock[], options: Record<string, unknow
   return { prompt: arrayToAsyncIterable(userMessages), options }
 }
 
+/** 客户端可传入的 agent 可选参数（安全无关字段） */
+export interface AgentOptions {
+  model?: string
+  maxTurns?: number
+  systemPrompt?: string
+  allowedTools?: string[]
+  maxBudgetUsd?: number
+  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+  additionalDirectories?: string[]
+  env?: Record<string, string>
+  thinking?: { type: 'enabled'; budget_tokens: number }
+}
+
 /** 构建 SDK options */
 function buildOptions(
   runtime: RuntimeSession,
   sseWriter?: (ev: SseEvent) => void,
-  bypassPermissions = true
+  bypassPermissions = true,
+  agentOptions: AgentOptions = {}
 ): Record<string, unknown> {
   const log = logger.child({ sessionId: (runtime.sessionId ?? 'new').slice(0, 12) })
 
@@ -105,11 +119,33 @@ function buildOptions(
     return { behavior: 'allow', updatedInput: input }
   }
 
+  const {
+    allowedTools,
+    model,
+    maxTurns,
+    systemPrompt,
+    maxBudgetUsd,
+    effort,
+    additionalDirectories,
+    env,
+    thinking,
+  } = agentOptions
+
   const options: Record<string, unknown> = {
     cwd: runtime.cwd,
-    allowedTools: ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'AskUserQuestion'],
+    allowedTools: allowedTools ?? ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'AskUserQuestion'],
     // 有已有 sessionId 则 resume，否则新建
     ...(runtime.sessionId ? { resume: runtime.sessionId } : {}),
+    // 客户端可选参数
+    ...(model !== undefined ? { model } : {}),
+    ...(maxTurns !== undefined ? { maxTurns } : {}),
+    ...(systemPrompt !== undefined ? { systemPrompt } : {}),
+    ...(maxBudgetUsd !== undefined ? { maxBudgetUsd } : {}),
+    ...(effort !== undefined ? { effort } : {}),
+    ...(additionalDirectories?.length ? { additionalDirectories } : {}),
+    ...(env !== undefined ? { env } : {}),
+    ...(thinking !== undefined ? { thinking } : {}),
+    // 安全相关放最后，不允许被覆盖
     ...(bypassPermissions ? { permissionMode: 'bypassPermissions' } : { canUseTool }),
     ...(runtime.abort ? { abortController: runtime.abort } : {}),
   }
@@ -209,14 +245,15 @@ export async function runAgent(
   runtime: RuntimeSession,
   content: IncomingBlock[],
   plainText: string,
-  bypassPermissions = true
+  bypassPermissions = true,
+  agentOptions: AgentOptions = {}
 ): Promise<SseDone> {
   const log = logger.child({ sessionId: (runtime.sessionId ?? 'new').slice(0, 12) })
   log.info({ prompt: plainText.slice(0, 80) }, 'agent start (blocking)')
   runtime.status = 'busy'
   runtime.abort = new AbortController()
 
-  const options = buildOptions(runtime, undefined, bypassPermissions)
+  const options = buildOptions(runtime, undefined, bypassPermissions, agentOptions)
   let cost: number | undefined
   let tokens: SseDone['tokens']
   const messages: SseRawMessage[] = []
@@ -262,7 +299,8 @@ export async function runAgentStream(
   content: IncomingBlock[],
   plainText: string,
   reply: FastifyReply,
-  bypassPermissions = true
+  bypassPermissions = true,
+  agentOptions: AgentOptions = {}
 ) {
   reply.hijack()
   reply.raw.writeHead(200, {
@@ -279,7 +317,7 @@ export async function runAgentStream(
   runtime.abort = new AbortController()
 
   const writer = (ev: SseEvent) => sseWrite(reply, ev)
-  const options = buildOptions(runtime, writer, bypassPermissions)
+  const options = buildOptions(runtime, writer, bypassPermissions, agentOptions)
 
   let cost: number | undefined
   let tokens: SseDone['tokens']

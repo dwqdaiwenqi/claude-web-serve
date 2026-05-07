@@ -1,3 +1,5 @@
+[English](./README.en.md) | 简体中文
+
 # @claude-web/server
 
 将 [Claude Code Agent SDK](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk) 封装为 HTTP API 服务，同时提供 `claude-web` CLI 工具。
@@ -59,6 +61,7 @@ Project ID 由目录路径推导，将路径分隔符替换为 `-`（如 `/home/
 | GET    | `/session/:id`                  | 获取会话信息（标题、状态、cwd 等）                                  |
 | DELETE | `/session/:id`                  | 删除会话（清理 .jsonl 文件与运行时状态）                            |
 | PATCH  | `/session/:id`                  | 重命名会话，body: `{ "title": string }`                             |
+| POST   | `/session/:id/abort`            | 中止正在运行的会话                                                  |
 | GET    | `/session/:id/message`          | 获取消息历史，query: `offset`                                       |
 | POST   | `/session/:id/message`          | 发送消息（阻塞模式）                                                |
 | POST   | `/session/:id/message?stream=1` | 发送消息（SSE 流式）                                                |
@@ -97,7 +100,18 @@ curl -X POST 'http://127.0.0.1:8003/api/session/new/message' \
 {
   "prompt": "你好",
   "cwd": "/your/project",
-  "bypassPermissions": true
+  "bypassPermissions": true,
+  "options": {
+    "model": "claude-opus-4-6",
+    "maxTurns": 10,
+    "systemPrompt": "你是一个 TypeScript 专家",
+    "allowedTools": ["Read", "Write", "Bash"],
+    "maxBudgetUsd": 0.5,
+    "effort": "high",
+    "additionalDirectories": ["/shared/libs"],
+    "env": { "NODE_ENV": "development" },
+    "thinking": { "type": "enabled", "budget_tokens": 8000 }
+  }
 }
 ```
 
@@ -111,6 +125,22 @@ curl -X POST 'http://127.0.0.1:8003/api/session/new/message' \
   ]
 }
 ```
+
+**`options` 字段说明：**
+
+| 字段                   | 类型                                     | 说明                                               |
+| ---------------------- | ---------------------------------------- | -------------------------------------------------- |
+| `model`                | `string`                                 | 指定模型（如 `claude-opus-4-6`、`claude-haiku-4-5-20251001`） |
+| `maxTurns`             | `number`                                 | 限制 agent 最大轮次，防止无限循环                  |
+| `systemPrompt`         | `string`                                 | 追加自定义 system prompt                           |
+| `allowedTools`         | `string[]`                               | 覆盖默认工具白名单                                 |
+| `maxBudgetUsd`         | `number`                                 | 限制单次最大花费（美元）                           |
+| `effort`               | `'low'｜'medium'｜'high'｜'xhigh'｜'max'` | 控制响应质量 vs 速度                               |
+| `additionalDirectories`| `string[]`                               | 允许 agent 访问的额外目录（项目目录之外）          |
+| `env`                  | `Record<string, string>`                 | 注入到 agent 进程的环境变量                        |
+| `thinking`             | `{ type: 'enabled', budget_tokens: number }` | 开启扩展思考模式                              |
+
+> **注**：安全相关字段（`permissionMode`、`abortController`）由服务端固定，不会被 `options` 覆盖。
 
 **阻塞模式** — 等待 Agent 完成后一次性返回：
 
@@ -140,7 +170,7 @@ curl -X POST 'http://127.0.0.1:8003/api/session/<sessionId>/message?stream=1' \
 | ---------- | --------------------------------------------------------- | --------------------------------------------- |
 | `message`  | `{ type, uuid, session_id, message, parent_tool_use_id }` | SDK 原始消息（文本 / 工具调用 / 工具结果）    |
 | `done`     | `{ sessionId, cost, tokens }`                             | Agent 完成，含费用与 token 用量（含缓存细分） |
-| `error`    | `{ message: string }`                                     | 执行出错                                      |
+| `error`    | `{ message: string }`                                     | 执行出错或被中止                              |
 | `ask_user` | `{ questions: [...] }`                                    | Agent 触发 AskUserQuestion，等待客户端回答    |
 
 **处理 `ask_user`：** 收到事件后，调用 resolve 接口提交答案，Agent 才会继续执行：

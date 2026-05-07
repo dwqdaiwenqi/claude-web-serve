@@ -13,7 +13,7 @@ import {
   createPendingRuntime,
   resolvePendingApproval,
 } from '@/store'
-import { runAgent, runAgentStream, type IncomingBlock } from '@/agent'
+import { runAgent, runAgentStream, type IncomingBlock, type AgentOptions } from '@/agent'
 
 export async function sessionRoutes(api: FastifyInstance) {
   // ── 获取 Session 信息 ────────────────────────────────────
@@ -167,6 +167,7 @@ export async function sessionRoutes(api: FastifyInstance) {
       content?: IncomingBlock[]
       cwd?: string
       bypassPermissions?: boolean
+      options?: AgentOptions
     }
 
     let runtime
@@ -217,12 +218,14 @@ export async function sessionRoutes(api: FastifyInstance) {
     const wantsStream =
       req.headers['accept'] === 'text/event-stream' || (req.query as any).stream === '1'
 
+    const agentOptions: AgentOptions = body.options ?? {}
+
     if (wantsStream) {
       logger.info({ sessionId: id, isNew }, 'starting agent in stream mode')
       // runAgentStream 内部调用 reply.hijack() 接管连接，自己写 SSE 帧，最后 reply.raw.end()
-      await runAgentStream(runtime, content, plainText, reply, bypassPermissions)
+      await runAgentStream(runtime, content, plainText, reply, bypassPermissions, agentOptions)
       return reply
     }
-    return runAgent(runtime, content, plainText, bypassPermissions)
+    return runAgent(runtime, content, plainText, bypassPermissions, agentOptions)
   })
 }

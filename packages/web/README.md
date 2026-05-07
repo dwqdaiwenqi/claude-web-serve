@@ -1,3 +1,5 @@
+[English](./README.en.md) | 简体中文
+
 # @claude-web/ui
 
 Claude Code 的 Web 前端，基于 React + Ant Design 构建。需配合 [@claude-web/server](https://www.npmjs.com/package/@claude-web/server) 使用。
@@ -6,7 +8,7 @@ Claude Code 的 Web 前端，基于 React + Ant Design 构建。需配合 [@clau
 
 ### 项目管理
 
-首页展示所有已有的Claude的项目，显示项目路径、会话数量与最近更新时间，点击进入项目会话页。
+首页展示所有已有的 Claude 项目，显示项目路径、会话数量与最近更新时间，点击进入项目会话页。
 
 ### 多会话对话
 
@@ -20,7 +22,11 @@ Claude Code 的 Web 前端，基于 React + Ant Design 构建。需配合 [@clau
 - `@` 触发文件补全，选中后将文件内容作为上下文一并发送
 - `/` 触发预设命令补全
 - 支持直接粘贴图片（PNG / JPEG / WebP），以 base64 格式发送给 Claude
-- Shift+Enter 换行，Enter 发送
+- `Shift+Enter` 换行，`Enter` 发送
+
+### Diff 预览
+
+工具调用中的文件写入操作会自动展示 diff 视图，直观呈现 Claude 对文件的修改内容。
 
 ### 文件查看器
 
