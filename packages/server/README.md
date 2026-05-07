@@ -34,10 +34,12 @@ Base URL：`http://127.0.0.1:8003/api`
 | 方法 | 路径                                | 说明                                      |
 | ---- | ----------------------------------- | ----------------------------------------- |
 | GET  | `/project`                          | 列出所有已关联的项目                      |
+| POST | `/project/link`                     | 添加项目，body: `{ "cwd": string }`       |
 | GET  | `/project/:id/session`              | 获取项目下的会话列表                      |
 | GET  | `/project/:id/tree?path=/`          | 获取文件目录树                            |
 | GET  | `/project/:id/file?path=/src/a.ts`  | 读取文本文件内容（最大 1 MB）             |
 | GET  | `/project/:id/file/raw?path=/a.png` | 读取二进制文件（图片 / 音频，最大 20 MB） |
+| GET  | `/fs/dirs?path=/your/dir`           | 浏览本机目录（默认返回 Home 目录）        |
 
 **Project 对象：**
 
@@ -51,6 +53,36 @@ Base URL：`http://127.0.0.1:8003/api`
 ```
 
 Project ID 由目录路径推导，将路径分隔符替换为 `-`（如 `/home/user/proj` → `-home-user-proj`）。
+
+**添加项目：**
+
+```bash
+curl -X POST 'http://127.0.0.1:8003/api/project/link' \
+  -H 'Content-Type: application/json' \
+  -d '{"cwd":"/your/project"}'
+```
+
+返回：`{ "ok": true, "id": "-your-project", "cwd": "/your/project" }`
+
+- 目录必须存在于本机文件系统
+- 若该项目已存在（`~/.claude/projects/` 下已有对应目录）则幂等，不会报错
+- 新添加的项目 `sessionCount` 为 0，可直接发消息开始新会话
+
+**浏览本机目录（用于目录选择器）：**
+
+```bash
+# 返回 Home 目录下的子目录
+GET /api/fs/dirs
+
+# 返回指定路径下的子目录
+GET /api/fs/dirs?path=/Users/you/code
+```
+
+返回：`{ "path": "/Users/you/code", "dirs": [{ "name": "myproject", "path": "/Users/you/code/myproject" }, ...] }`
+
+- 只返回目录，不含文件
+- 以 `.` 开头的隐藏目录不返回
+- 无权限访问的目录返回空 `dirs` 数组（不报错）
 
 ---
 

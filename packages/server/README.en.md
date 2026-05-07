@@ -52,6 +52,36 @@ Base URL: `http://127.0.0.1:8003/api`
 
 Project ID is derived from the directory path by replacing path separators with `-` (e.g. `/home/user/proj` → `-home-user-proj`).
 
+**Add a project:**
+
+```bash
+curl -X POST 'http://127.0.0.1:8003/api/project/link' \
+  -H 'Content-Type: application/json' \
+  -d '{"cwd":"/your/project"}'
+```
+
+Returns: `{ "ok": true, "id": "-your-project", "cwd": "/your/project" }`
+
+- The directory must exist on the local filesystem
+- Idempotent — calling again for an already-linked project does not error
+- Newly added projects have `sessionCount: 0`; send a message to start the first session
+
+**Browse local directories (for directory pickers):**
+
+```bash
+# List subdirectories of the Home directory
+GET /api/fs/dirs
+
+# List subdirectories of a specific path
+GET /api/fs/dirs?path=/Users/you/code
+```
+
+Returns: `{ "path": "/Users/you/code", "dirs": [{ "name": "myproject", "path": "/Users/you/code/myproject" }, ...] }`
+
+- Only directories are returned, not files
+- Hidden directories (starting with `.`) are excluded
+- Directories that cannot be read (permission denied) return an empty `dirs` array without erroring
+
 ---
 
 ### Session
