@@ -6,7 +6,7 @@
     "dev:server": "pnpm --filter @claude-web/server dev",
     "dev:web": "pnpm --filter @claude-web/ui dev",
     "build": "pnpm -r build && rm -rf packages/server/public && cp -r packages/web/dist packages/server/public",
-    "release:server": "cd packages/server && npm version patch && pnpm build && npm publish --access public",
+    "release:server": "cd packages/server && npm version patch && cd ../.. && pnpm build && cd packages/server && npm publish --access public",
     "release:ui": "cd packages/web && npm version patch && pnpm build && npm publish --access public",
     "start": "node packages/server/dist/cli.js start",
     "preview": "http-server packages/web/dist -p 3006 --cors",

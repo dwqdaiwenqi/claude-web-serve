@@ -82,11 +82,20 @@ export async function startServer(opts: ServerOptions = {}): Promise<void> {
     { prefix: '/api' }
   )
 
-  // 静态文件（前端）
   const publicDir = path.join(path.dirname(new URL(import.meta.url).pathname), '../public')
+  logger.debug({ publicDir }, 'static files dir')
+
   if (fs.existsSync(publicDir)) {
+    // 注册静态插件：所有 /assets、/favicon.ico 等请求直接返回对应文件
     await app.register(staticPlugin, { root: publicDir, prefix: '/' })
-    app.setNotFoundHandler((_, reply) => reply.sendFile('index.html'))
+    // SPA fallback：所有未命中 API 路由的请求都返回 index.html，让前端路由（react-router）处理
+    app.setNotFoundHandler((req, reply) => {
+      logger.debug({ url: req.url }, 'SPA fallback → index.html')
+      reply.sendFile('index.html')
+    })
+    logger.info({ publicDir }, 'serving static frontend')
+  } else {
+    logger.warn({ publicDir }, 'public dir not found, skipping static file serving (dev mode?)')
   }
 
   const availablePort = await findAvailablePort(port)
