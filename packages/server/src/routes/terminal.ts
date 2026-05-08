@@ -37,8 +37,11 @@ export async function terminalRoutes(api: FastifyInstance) {
     socket.on('message', (msg: Buffer | string) => {
       try {
         const parsed = JSON.parse(msg.toString())
-        if (parsed.type === 'resize') {
+        // 只有明确是 resize 指令才走控制路径，其余（包括纯数字 JSON）一律写入 pty
+        if (parsed && typeof parsed === 'object' && parsed.type === 'resize') {
           proc?.resize?.(parsed.cols, parsed.rows)
+        } else {
+          proc?.write?.(msg.toString())
         }
       } catch {
         proc?.write?.(msg.toString())
