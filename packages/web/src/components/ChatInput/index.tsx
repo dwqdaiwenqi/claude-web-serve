@@ -300,7 +300,7 @@ export default function ChatInput({
             icon={<PlusOutlined />}
             disabled={disabled}
             onClick={() => fileInputRef.current?.click()}
-            style={{ position: 'absolute', left: 0, top: 76 }}
+            style={{ position: 'absolute', left: 0, bottom: -43 }}
           />
         </Tooltip>
 
