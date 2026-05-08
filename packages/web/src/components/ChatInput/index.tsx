@@ -318,7 +318,8 @@ export default function ChatInput({
           onChange={(e) => onChange(e.target.value)}
           onPaste={handlePaste}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+            // isComposing 为 true 时说明正在 IME 合成（中文/日文输入法选字阶段），忽略 Enter
+            if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.nativeEvent.isComposing) {
               e.preventDefault()
               handleSend()
             }
