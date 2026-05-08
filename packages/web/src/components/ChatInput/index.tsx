@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { theme, App } from 'antd'
+import { theme, App, Button, Tooltip } from 'antd'
 import { PlusOutlined, CloseOutlined, FileOutlined } from '@ant-design/icons'
 import { MentionsInput, Mention, type SuggestionDataItem } from 'react-mentions'
 import { api } from '@/http/index'
@@ -292,35 +292,17 @@ export default function ChatInput({
 
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
         {/* 添加附件按钮 */}
-        <div
-          onClick={() => {
-            if (!disabled) {
-              fileInputRef.current?.click()
-            }
-          }}
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 6,
-            border: `1px solid ${token.colorBorderSecondary}`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: disabled ? 'not-allowed' : 'pointer',
-            color: token.colorTextTertiary,
-            flexShrink: 0,
-            marginBottom: 2,
-            transition: 'color 0.15s, border-color 0.15s',
-          }}
-          onMouseEnter={(e) => {
-            if (!disabled) e.currentTarget.style.color = token.colorText
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = token.colorTextTertiary
-          }}
-        >
-          <PlusOutlined style={{ fontSize: 13 }} />
-        </div>
+
+        <Tooltip title="添加附件" placement="top">
+          <Button
+            color="default"
+            variant="filled"
+            icon={<PlusOutlined />}
+            disabled={disabled}
+            onClick={() => fileInputRef.current?.click()}
+            style={{ position: 'absolute', left: 0, top: 76 }}
+          />
+        </Tooltip>
 
         <input
           ref={fileInputRef}
