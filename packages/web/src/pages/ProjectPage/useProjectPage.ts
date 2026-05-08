@@ -9,11 +9,13 @@ import {
   type ContentBlock,
   type AskUserQuestion,
 } from '@/http/index'
+import type { Attachment } from '@/components/ChatInput/index.tsx'
 import { type DisplayMessage } from '@/components/MessageBubble/index.tsx'
 import { FileTreePanel, toTreeData } from '@/components/FileTreePanel/index.tsx'
 import { type FileDiff } from '@/components/DiffReview/index.tsx'
 import { mergeDiffs, extractDiffsFromMessages } from '@/components/DiffReview/utils'
 import { isMediaFile } from '@/utils/file'
+
 
 export interface ImageData {
   data: string
@@ -151,15 +153,19 @@ export function useProjectPage() {
       const base64 = (reader.result as string).split(',')[1]
       const media_type = file.type as ImageData['media_type']
       const key = `[Image ${imageMap.size + 1}]`
-      setImageMap((prev) => new Map(prev).set(key, { data: base64, media_type: media_type }))
+      setImageMap((prev) => new Map(prev).set(key, { data: base64, media_type }))
       setInput((prev) => prev + key)
     }
     reader.readAsDataURL(file)
   }
 
-  async function buildContent(raw: string): Promise<ContentBlock[]> {
-    const TOKEN_RE = /(\[Image \d+\]|@\[[^\]]*\]\([^)]+\))/g
+  // 把输入框文字（含 [Image N] token 和 @file 引用）+ 附件 组合成 content 块数组
+  // 顺序：文字中内嵌图片按位置排列，附件追加在末尾
+  function buildContent(raw: string, attachments: Attachment[]): ContentBlock[] {
     const blocks: ContentBlock[] = []
+
+    // 同时匹配 [Image N]（粘贴图片 token）和 @[display](path)（@文件引用）
+    const TOKEN_RE = /(\[Image \d+\]|@\[[^\]]*\]\([^)]+\))/g
     let last = 0
     let match: RegExpExecArray | null
     while ((match = TOKEN_RE.exec(raw)) !== null) {
@@ -176,10 +182,26 @@ export function useProjectPage() {
       last = match.index + token.length
     }
     if (last < raw.length) blocks.push({ type: 'text', text: raw.slice(last) })
+
+    // 附件追加在末尾：图片用扁平格式，文本文件包 XML 标签
+    for (const att of attachments) {
+      if (att.mediaType) {
+        blocks.push({ type: 'image', media_type: att.mediaType, data: att.content } as any)
+      } else {
+        blocks.push({ type: 'text', text: `<file name="${att.name}">\n${att.content}\n</file>` })
+      }
+    }
+
+    // 合并相邻 text 块，但文件附件块不参与合并（保证 <file name="..."> 始终在块起始位置，正则才能匹配）
+    const isFileBlock = (b: ContentBlock) =>
+      b.type === 'text' && (b as any).text?.startsWith('<file name="')
     return blocks.reduce<ContentBlock[]>((acc, block) => {
       const prev = acc[acc.length - 1]
-      if (block.type === 'text' && prev?.type === 'text') prev.text += block.text
-      else acc.push(block)
+      if (block.type === 'text' && prev?.type === 'text' && !isFileBlock(block) && !isFileBlock(prev)) {
+        prev.text += (block as any).text
+      } else {
+        acc.push(block)
+      }
       return acc
     }, [])
   }
@@ -218,8 +240,9 @@ export function useProjectPage() {
       setFileLoading(false)
     }
   }
-  async function sendMessage() {
-    if (!input.trim() || !activeId || loading) return
+  async function sendMessage(attachments: Attachment[]) {
+    if (!input.trim() && attachments.length === 0) return
+    if (!activeId || loading) return
     const raw = input.trim()
     const sessionId = activeId
     const isNew = sessionId === NEW_SESSION_ID
@@ -228,7 +251,7 @@ export function useProjectPage() {
     setImageMap(new Map())
     setLoading(true)
 
-    const content = await buildContent(raw)
+    const content = buildContent(raw, attachments)
 
     const userSdkMsg: SessionMessage = {
       type: 'user',
@@ -251,7 +274,8 @@ export function useProjectPage() {
     )
 
     const sendId = isNew ? NEW_SESSION_ID : sessionId
-    const cwd = isNew ? projectCwd : undefined
+    // 始终传 cwd，服务重启后内存 runtime 丢失时服务端可从 cwd 重建
+    const cwd = projectCwd
 
     try {
       await api.sendMessageStream(sendId, content, bypassPermissions, cwd, {
