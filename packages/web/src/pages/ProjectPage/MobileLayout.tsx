@@ -58,7 +58,6 @@ export default function MobileLayout(p: Props) {
               style={{ color: '#888', cursor: 'pointer', fontSize: 15 }}
               onClick={() => navigate('/')}
             />
-            <span style={{ fontSize: 13, fontWeight: 600, color: C.text0 }}>会话列表</span>
           </div>
           <SessionList
             projectCwd={p.projectCwd}
