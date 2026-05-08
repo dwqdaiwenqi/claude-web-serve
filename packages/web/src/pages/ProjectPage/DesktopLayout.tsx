@@ -159,11 +159,15 @@ export default function DesktopLayout(p: Props) {
               </Splitter>
             </Splitter.Panel>
 
-            {p.termOpen && (
-              <Splitter.Panel defaultSize={220} min={80} max={600} style={{ overflow: 'hidden' }}>
-                <TerminalPanel cwd={p.projectCwd} onClose={() => p.setTermOpen(false)} />
-              </Splitter.Panel>
-            )}
+            <Splitter.Panel
+              size={p.termOpen ? undefined : 0}
+              defaultSize={220}
+              min={80}
+              max={600}
+              style={{ overflow: 'hidden' }}
+            >
+              <TerminalPanel cwd={p.projectCwd} onClose={() => p.setTermOpen(false)} />
+            </Splitter.Panel>
           </Splitter>
 
           {/* 底部状态栏 */}
