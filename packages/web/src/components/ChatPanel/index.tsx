@@ -15,6 +15,7 @@ import {
 import { ArrowUpOutlined, XFilled } from '@ant-design/icons'
 import type { AskUserQuestion, SsePart } from '@/http/index'
 import type { SessionMessage } from '@/http/index'
+import type { Attachment } from '@/components/ChatInput/index.tsx'
 
 interface DisplayMessage {
   id: string
@@ -259,7 +260,7 @@ interface ChatPanelProps {
   loading: boolean
   input: string
   onInputChange: (v: string) => void
-  onSend: () => void
+  onSend: (attachments: Attachment[]) => void
   onAbort?: () => void
   onPasteImage: (file: File) => void
   activeProjectID: string | null
@@ -394,9 +395,7 @@ export default function ChatPanel({
         <ChatInput
           value={input}
           onChange={onInputChange}
-          onPasteImage={(file) => {
-            onPasteImage?.(file)
-          }}
+          onPasteImage={onPasteImage}
           onSend={onSend}
           disabled={!activeId || loading}
           activeProjectID={activeProjectID}
@@ -425,7 +424,7 @@ export default function ChatPanel({
                 color="primary"
                 variant="filled"
                 icon={<ArrowUpOutlined />}
-                onClick={onSend}
+                onClick={() => onSend([])}
                 disabled={!activeId || !input.trim()}
               />
             )}

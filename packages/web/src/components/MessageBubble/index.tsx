@@ -1,6 +1,12 @@
-import React from 'react'
-import { Space, Typography, theme } from 'antd'
-import { RobotOutlined, UserOutlined, ToolOutlined, LoadingOutlined } from '@ant-design/icons'
+import React, { useState } from 'react'
+import { Space, Typography, theme, Image, Modal } from 'antd'
+import {
+  RobotOutlined,
+  UserOutlined,
+  ToolOutlined,
+  LoadingOutlined,
+  FileOutlined,
+} from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { SessionMessage } from '@/http/index'
@@ -149,6 +155,64 @@ function ToolCallBlock({ block }: { block: any }) {
   )
 }
 
+function FileCard({ name, content, token }: { name: string; content: string; token: any }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <div
+        onClick={() => setOpen(true)}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '5px 10px',
+          border: `1px solid ${token.colorBorderSecondary}`,
+          borderRadius: 6,
+          background: token.colorFillAlter,
+          marginTop: 4,
+          maxWidth: 240,
+          cursor: 'pointer',
+        }}
+      >
+        <FileOutlined style={{ fontSize: 13, color: token.colorTextSecondary, flexShrink: 0 }} />
+        <span
+          style={{
+            fontSize: 12,
+            fontWeight: 500,
+            color: token.colorText,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {name}
+        </span>
+      </div>
+      <Modal
+        title={name}
+        open={open}
+        onCancel={() => setOpen(false)}
+        footer={null}
+        width={720}
+        styles={{ body: { maxHeight: '70vh', overflow: 'auto' } }}
+      >
+        <pre
+          style={{
+            margin: 0,
+            fontSize: 13,
+            fontFamily: 'monospace',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all',
+            color: token.colorText,
+          }}
+        >
+          {content}
+        </pre>
+      </Modal>
+    </>
+  )
+}
+
 function ToolResultBlock({ block }: { block: any }) {
   const { token } = theme.useToken()
 
@@ -184,22 +248,26 @@ function ToolResultBlock({ block }: { block: any }) {
           }
           if (!src) return null
           return (
-            <img
+            <Image
               key={i}
               src={src}
-              style={{
-                maxWidth: '100%',
-                maxHeight: 240,
-                borderRadius: 4,
-                display: 'block',
-                marginTop: 4,
-              }}
+              style={{ maxHeight: 240, borderRadius: 4, display: 'block', marginTop: 4 }}
             />
           )
         }
 
         const text = String(item.text ?? '')
+
         if (!text) return null
+
+        // 检测文本附件：<file name="...">内容</file>
+        // 文本文件附件走这个格式存储，渲染成文件卡片而不是纯文字
+        const fileMatch = text.match(/^<file name="([^"]+)">\n([\s\S]*?)\n?<\/file>$/)
+        if (fileMatch) {
+          const [, name, content] = fileMatch
+          return <FileCard key={i} name={name} content={content} token={token} />
+        }
+
         return (
           <span key={i} style={{ fontSize: 13, color: token.colorText, wordBreak: 'break-all' }}>
             {text.slice(0, 500)}
@@ -247,9 +315,109 @@ function SdkMessageView({ m }: { m: SessionMessage }) {
   }
 
   if (m.type === 'user') {
+    // 把 content 分成两组：
+    // - inlineBlocks：文字 + 粘贴图片（按位置顺序，富文本混排）
+    // - attachmentBlocks：通过附件按钮上传的图片和文件（底部单独展示）
+    // 区分依据：文字附件用 <file name="..."> 包裹，附件图片紧跟在文字块之后（末尾）
+    // 简化策略：text 块中含 <file> 标签 或 image 块在所有 text 块之后 → 归为附件区
+    const FILE_RE = /^<file name="([^"]+)">\n([\s\S]*?)\n?<\/file>$/
+
+    // 找到最后一个非附件 text block 的位置，之后的 image 块视为附件
+    let lastInlineTextIdx = -1
+    content.forEach((b: any, i: number) => {
+      if (b.type === 'text' && b.text && !FILE_RE.test(b.text)) {
+        lastInlineTextIdx = i
+      }
+    })
+
+    const inlineBlocks: any[] = []
+    const attachmentBlocks: any[] = []
+    content.forEach((b: any, i: number) => {
+      if (b.type === 'tool_result') {
+        inlineBlocks.push({ ...b, _idx: i })
+      } else if (b.type === 'text' && FILE_RE.test(b.text)) {
+        attachmentBlocks.push({ ...b, _idx: i })
+      } else if (b.type === 'image' && i > lastInlineTextIdx) {
+        // image 在所有普通文字之后 → 附件区
+        attachmentBlocks.push({ ...b, _idx: i })
+      } else {
+        inlineBlocks.push({ ...b, _idx: i })
+      }
+    })
+
     return (
       <>
-        <ToolResultBlock block={{ content }} />
+        {/* 文字 + 粘贴图片区 */}
+        {inlineBlocks.map((b: any) => {
+          if (b.type === 'tool_result') return <ToolResultBlock key={b._idx} block={b} />
+          if (b.type === 'image') {
+            let src: string | null = null
+            if (b.source?.type === 'base64')
+              src = `data:${b.source.media_type};base64,${b.source.data}`
+            else if (b.data) src = `data:${b.media_type};base64,${b.data}`
+            if (!src) return null
+            return (
+              <Image
+                key={b._idx}
+                src={src}
+                style={{ maxHeight: 240, borderRadius: 4, display: 'block', marginTop: 4 }}
+              />
+            )
+          }
+          if (b.type === 'text' && b.text) {
+            return (
+              <div key={b._idx} className="markdown-body">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{b.text}</ReactMarkdown>
+              </div>
+            )
+          }
+          return null
+        })}
+
+        {/* 附件区：图片卡片 + 文件卡片横排 */}
+        {attachmentBlocks.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+            {attachmentBlocks.map((b: any) => {
+              if (b.type === 'image') {
+                let src: string | null = null
+                if (b.source?.type === 'base64')
+                  src = `data:${b.source.media_type};base64,${b.source.data}`
+                else if (b.data) src = `data:${b.media_type};base64,${b.data}`
+                if (!src) return null
+                return (
+                  <div
+                    key={b._idx}
+                    style={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: 6,
+                      overflow: 'hidden',
+                      flexShrink: 0,
+                      border: `1px solid ${token.colorBorderSecondary}`,
+                    }}
+                  >
+                    <Image
+                      src={src}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        display: 'block',
+                      }}
+                    />
+                  </div>
+                )
+              }
+              if (b.type === 'text') {
+                const m = b.text.match(FILE_RE)
+                if (!m) return null
+                const [, name, content] = m
+                return <FileCard key={b._idx} name={name} content={content} token={token} />
+              }
+              return null
+            })}
+          </div>
+        )}
       </>
     )
   }
