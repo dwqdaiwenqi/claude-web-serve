@@ -1,12 +1,6 @@
 import React, { useState } from 'react'
-import { Space, Typography, theme, Image, Modal } from 'antd'
-import {
-  RobotOutlined,
-  UserOutlined,
-  ToolOutlined,
-  LoadingOutlined,
-  FileOutlined,
-} from '@ant-design/icons'
+import { Space, Typography, Collapse, theme, Image, Modal } from 'antd'
+import { CaretRightOutlined, ToolOutlined, LoadingOutlined, FileOutlined } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { SessionMessage } from '@/http/index'
@@ -71,7 +65,7 @@ function DiffView({ oldStr, newStr }: { oldStr: string; newStr: string }) {
 function ToolCallBlock({ block }: { block: any }) {
   const { token } = theme.useToken()
   const input = block.input ?? {}
-  const name: string = block.name ?? ''
+  let name: string = block.name ?? ''
   const type = block.type
 
   // 每种工具定制显示
@@ -108,6 +102,8 @@ function ToolCallBlock({ block }: { block: any }) {
     header = input.pattern ?? ''
   } else if (name === 'Grep') {
     header = `${input.pattern ?? ''}${input.path ? ` in ${input.path}` : ''}`
+  } else if (name === 'Agent') {
+    header = `${input?.prompt || ''}`
   } else {
     header = (input.file_path ??
       input.command ??
@@ -119,38 +115,53 @@ function ToolCallBlock({ block }: { block: any }) {
 
   // thinking 从type区分，而不是name
   if (type === 'thinking') {
+    name = 'Thinking'
     header = block.thinking ?? 'thinking'
   } else if (type === 'redacted_thinking') {
+    name = 'Redacted Thinking'
     header = block.data ?? 'redacted_thinking'
   }
 
   return (
     <div style={{ padding: '4px 0' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          color: token.colorTextTertiary,
-          fontSize: 12,
-        }}
-      >
-        <ToolOutlined style={{ fontSize: 11, flexShrink: 0 }} />
-        <span style={{ fontWeight: 500 }}>{name}</span>
-        {header && (
-          <span
+      <Collapse
+        bordered={false}
+        size="small"
+        expandIcon={({ isActive }) => (
+          <CaretRightOutlined
             style={{
-              opacity: 0.75,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
+              color: token.colorTextTertiary,
             }}
-          >
-            · {header}
-          </span>
+            rotate={isActive ? 90 : 0}
+          />
         )}
-      </div>
-      {detail}
+        style={{
+          padding: 0,
+        }}
+        items={[
+          {
+            key: '1',
+            label: (
+              <div
+                style={{
+                  color: token.colorTextTertiary,
+                  fontSize: 12,
+                }}
+              >
+                <ToolOutlined style={{ fontSize: 11, flexShrink: 0, marginRight: '5px' }} />
+                <span style={{ fontWeight: 500 }}>{name}</span>
+              </div>
+            ),
+            children: (
+              <div>
+                {header && header}
+                {detail}
+              </div>
+            ),
+          },
+        ]}
+        defaultActiveKey={'1'}
+      />
     </div>
   )
 }
@@ -346,7 +357,7 @@ function SdkMessageView({ m }: { m: SessionMessage }) {
     })
 
     return (
-      <>
+      <div style={{ padding: '0 16px' }}>
         {/* 文字 + 粘贴图片区 */}
         {inlineBlocks.map((b: any) => {
           if (b.type === 'tool_result') return <ToolResultBlock key={b._idx} block={b} />
@@ -418,7 +429,7 @@ function SdkMessageView({ m }: { m: SessionMessage }) {
             })}
           </div>
         )}
-      </>
+      </div>
     )
   }
 

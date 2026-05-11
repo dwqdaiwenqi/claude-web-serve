@@ -171,6 +171,7 @@ function handleMessage(
   const log = logger.child({ sessionId: sessionId.slice(0, 12) })
   const sub = message.subtype as string | undefined
 
+  // console.log('message-------', message)
   if (message.type === 'system') {
     // SDK 分配了真实 sessionId（新建 session 时）
     if (message.session_id && !runtime.sessionId) {
